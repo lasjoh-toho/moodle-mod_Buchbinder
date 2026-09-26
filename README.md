@@ -139,8 +139,41 @@ Die Tests decken Seitenbereiche, Ausschießen, Scan-Bereinigung (synthetische Sc
 Dokumentmodell (Doppelseiten, Overlays, eingebrannte Abdeckungen, Asset Bank), die Webservices
 inklusive Rechteprüfung, Backup/Restore und Duplizieren, das Layout-System, Ausschnitte, den Hintergrund-Import, den PDF-Druck in allen Layouts, den Word-Import und die Harvester-Helfer ab.
 
-JavaScript liegt in `amd/src` als AMD-Module; `amd/build/*.min.js` sind unminifizierte Kopien mit
-Modulnamen. Mit `grunt amd` im Moodle-Verzeichnis lassen sich echte Builds erzeugen.
+JavaScript liegt in `amd/src`; nach Änderungen im Plugin-Verzeichnis `npx grunt amd` ausführen
+(im Moodle-Verzeichnis vorher `npm install`) und `amd/build` mit committen – die CI prüft, dass die
+Builds aktuell sind.
+
+## Release erstellen
+
+Die GitHub Actions in `.github/workflows` übernehmen Prüfung und Veröffentlichung:
+
+- **CI** (`ci.yml`) läuft bei jedem Push und Pull Request mit
+  [moodle-plugin-ci](https://moodlehq.github.io/moodle-plugin-ci/) gegen Moodle 4.4 (PHP 8.1 und 8.3),
+  4.5 (PHP 8.3) und 5.0 (PHP 8.4): PHP-Lint, Moodle-Codestil, PHPDoc, Plugin-Struktur,
+  Upgrade-Savepoints, Mustache-Templates, ESLint/aktuelle JavaScript-Builds und PHPUnit.
+- **Release** (`release.yml`) prüft Version und Changelog, lässt die CI laufen, baut
+  `mod_buchbinder_<release>.zip` und veröffentlicht es als GitHub-Release. Alpha-, Beta- und
+  RC-Versionen werden als Vorabversion markiert.
+
+**Variante 1 – per Knopfdruck:** Unter *Actions → Release → Run workflow* die neue Versionsnummer
+(z. B. `0.4.0`) und den Reifegrad wählen. Der Workflow setzt `version.php` (Versionsnummer im
+Format JJJJMMTTXX, immer steigend), macht aus dem Abschnitt `[Unreleased]` in `CHANGES.md` die neue
+Version, committet, taggt und veröffentlicht. Ist der Branch geschützt, muss
+`github-actions[bot]` pushen dürfen – sonst Variante 2 verwenden.
+
+**Variante 2 – von Hand:** lokal `.github/scripts/release.sh bump 0.4.0 MATURITY_BETA` ausführen
+(oder `version.php`/`CHANGES.md` selbst anpassen), committen und den Tag pushen:
+```
+git tag v0.4.0 && git push origin v0.4.0
+```
+
+Der Tag muss `v` + `$plugin->release` lauten und `CHANGES.md` einen Abschnitt für die Version
+enthalten, sonst bricht der Release ab. Das ZIP enthält den Ordner `buchbinder/` und wird unter
+*Website-Administration → Plugins → Plugin installieren* hochgeladen (oder nach `mod/` entpackt).
+
+**Optional: moodle.org.** Ist das Plugin im Moodle-Plugin-Verzeichnis registriert, lädt der
+Workflow jede Version automatisch hoch, sobald das Repository-Secret `MOODLE_ORG_TOKEN` gesetzt ist
+(Token unter moodle.org → Profil → Sicherheitsschlüssel, Dienst „Plugins directory API“).
 
 ## Roadmap
 - Texterkennung (OCR), um Reflow-Textblöcke automatisch zu füllen – geplant über Tesseract auf dem

@@ -1,0 +1,129 @@
+# Release workflow.
+#
+# Two ways to release (see README, section "Release erstellen"):
+#  1. Actions -> Release -> "Run workflow": enter the version (e.g. 0.4.0). The workflow updates
+#     version.php and CHANGES.md, commits, tags, tests and publishes the release.
+#  2. Update version.php and CHANGES.md yourself, then push a tag "v<release>" (e.g. v0.4.0).
+#
+# The release contains mod_buchbinder_<release>.zip, which can be installed via
+# Site administration -> Plugins -> Install plugins. Optionally the version is also uploaded to
+# the moodle.org plugins directory (secret MOODLE_ORG_TOKEN).
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release number, e.g. 0.4.0'
+        required: true
+        type: string
+      maturity:
+        description: 'Maturity'
+        required: true
+        default: 'MATURITY_ALPHA'
+        type: choice
+        options: [MATURITY_ALPHA, MATURITY_BETA, MATURITY_RC, MATURITY_STABLE]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Prepare version
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Bump version.php and CHANGES.md
+        if: github.event_name == 'workflow_dispatch'
+        run: .github/scripts/release.sh bump "${{ inputs.version }}" "${{ inputs.maturity }}"
+
+      - name: Commit and tag
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "Release v${{ inputs.version }}"
+          git tag "v${{ inputs.version }}"
+          git push origin "HEAD:${GITHUB_REF_NAME}" "v${{ inputs.version }}"
+
+      - name: Determine tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=v${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check tag, version.php and changelog
+        run: |
+          git checkout "${{ steps.tag.outputs.tag }}"
+          .github/scripts/release.sh check "${{ steps.tag.outputs.tag }}"
+
+  test:
+    name: Tests
+    needs: prepare
+    uses: ./.github/workflows/ci.yml
+    with:
+      ref: ${{ needs.prepare.outputs.tag }}
+
+  publish:
+    name: Publish release
+    needs: [prepare, test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.tag }}
+
+      - name: Build installable ZIP
+        id: build
+        run: |
+          .github/scripts/release.sh build
+          echo "zip=$(ls dist/*.zip)" >> "$GITHUB_OUTPUT"
+          echo "maturity=$(.github/scripts/release.sh field maturity)" >> "$GITHUB_OUTPUT"
+          .github/scripts/release.sh notes > dist/notes.md
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.prepare.outputs.tag }}
+          name: Buchbinder ${{ needs.prepare.outputs.tag }}
+          body_path: dist/notes.md
+          files: ${{ steps.build.outputs.zip }}
+          prerelease: ${{ steps.build.outputs.maturity != 'MATURITY_STABLE' }}
+
+      - name: Upload to moodle.org plugins directory (optional)
+        env:
+          TOKEN: ${{ secrets.MOODLE_ORG_TOKEN }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "No MOODLE_ORG_TOKEN secret set, skipping moodle.org upload."
+            exit 0
+          fi
+          ZIPURL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/download/${TAG}/$(basename "${{ steps.build.outputs.zip }}")"
+          RESPONSE=$(curl -s https://moodle.org/webservice/rest/server.php \
+            --data-urlencode "wstoken=${TOKEN}" \
+            --data-urlencode "wsfunction=local_plugins_add_version" \
+            --data-urlencode "moodlewsrestformat=json" \
+            --data-urlencode "frankenstyle=mod_buchbinder" \
+            --data-urlencode "zipurl=${ZIPURL}" \
+            --data-urlencode "vcssystem=git" \
+            --data-urlencode "vcsrepositoryurl=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" \
+            --data-urlencode "vcstag=${TAG}" \
+            --data-urlencode "changelogurl=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/blob/${TAG}/CHANGES.md" \
+            --data-urlencode "altdownloadurl=${ZIPURL}")
+          echo "$RESPONSE"
+          echo "$RESPONSE" | grep -q '"id"' || { echo "::error::Upload to moodle.org failed"; exit 1; }
