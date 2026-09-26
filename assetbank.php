@@ -50,6 +50,8 @@ $PAGE->activityheader->disable();
 /**
  * Masters the user may copy from, keyed by buchbinder id.
  *
+ * @param int $excludeid the current activity
+ *
  * @return array [buchbinder record, cm]
  */
 function mod_buchbinder_accessible_masters(int $excludeid): array {

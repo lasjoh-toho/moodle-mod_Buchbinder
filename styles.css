@@ -25,6 +25,7 @@
 .path-mod-buchbinder .bb-sheet {
     position: relative;
     width: 100%;
+    /* stylelint-disable-next-line csstree/validator */
     container-type: inline-size;
     background: #fff;
     user-select: none;
@@ -43,6 +44,7 @@
 
 .path-mod-buchbinder .bb-sheet .bb-html {
     padding: 6cqw 7cqw;
+    /* stylelint-disable-next-line csstree/validator */
     font-size: max(14px, 1.9cqw);
     color: #000;
 }
@@ -62,6 +64,7 @@
 
 /* Type-over: font size relative to a page width of 1000 units. */
 .path-mod-buchbinder .bb-textbox {
+    /* stylelint-disable-next-line csstree/validator */
     font-size: calc(var(--bb-fs, 16) * .1cqw);
     line-height: 1.2;
     white-space: pre-wrap;
@@ -87,6 +90,7 @@
 
 .mod-buchbinder-viewer button.bb-mask .bb-mask-label {
     color: #666;
+    /* stylelint-disable-next-line csstree/validator */
     font-size: max(11px, 1.4cqw);
 }
 
@@ -134,6 +138,7 @@
 .mod-buchbinder-viewer .bb-popover {
     position: absolute;
     z-index: 10;
+    /* stylelint-disable-next-line csstree/validator */
     max-width: min(24rem, 90vw);
 }
 
@@ -214,6 +219,7 @@
 
 @media print {
     .mod-buchbinder-viewer .bb-toolbar {
+        /* stylelint-disable-next-line declaration-no-important */
         display: none !important;
     }
 
@@ -222,6 +228,7 @@
     }
 
     .mod-buchbinder-viewer .bb-mask {
+        /* stylelint-disable-next-line declaration-no-important */
         opacity: 1 !important;
     }
 }
@@ -330,6 +337,7 @@
     border: 1px dashed #0f6cbf;
     cursor: move;
     overflow: hidden;
+    /* stylelint-disable-next-line csstree/validator */
     font-size: calc(var(--bb-fs, 12) * .1cqw);
     line-height: 1.2;
     white-space: pre-wrap;
@@ -434,18 +442,49 @@
     flex: 1 1 0;
 }
 
-.path-mod-buchbinder .bb-l-w-20 { flex: 0 0 calc(20% - 2cqw); }
-.path-mod-buchbinder .bb-l-w-25 { flex: 0 0 calc(25% - 2cqw); }
-.path-mod-buchbinder .bb-l-w-30 { flex: 0 0 calc(30% - 2cqw); }
-.path-mod-buchbinder .bb-l-w-33 { flex: 0 0 calc(33.333% - 2cqw); }
-.path-mod-buchbinder .bb-l-w-40 { flex: 0 0 calc(40% - 2cqw); }
-.path-mod-buchbinder .bb-l-w-50 { flex: 0 0 calc(50% - 2cqw); }
-.path-mod-buchbinder .bb-l-w-60 { flex: 0 0 calc(60% - 2cqw); }
-.path-mod-buchbinder .bb-l-w-67 { flex: 0 0 calc(66.667% - 2cqw); }
-.path-mod-buchbinder .bb-l-w-70 { flex: 0 0 calc(70% - 2cqw); }
-.path-mod-buchbinder .bb-l-w-75 { flex: 0 0 calc(75% - 2cqw); }
-.path-mod-buchbinder .bb-l-w-80 { flex: 0 0 calc(80% - 2cqw); }
+.path-mod-buchbinder .bb-l-w-20 {
+    flex: 0 0 calc(20% - 2cqw);
+}
 
+.path-mod-buchbinder .bb-l-w-25 {
+    flex: 0 0 calc(25% - 2cqw);
+}
+
+.path-mod-buchbinder .bb-l-w-30 {
+    flex: 0 0 calc(30% - 2cqw);
+}
+
+.path-mod-buchbinder .bb-l-w-33 {
+    flex: 0 0 calc(33.333% - 2cqw);
+}
+
+.path-mod-buchbinder .bb-l-w-40 {
+    flex: 0 0 calc(40% - 2cqw);
+}
+
+.path-mod-buchbinder .bb-l-w-50 {
+    flex: 0 0 calc(50% - 2cqw);
+}
+
+.path-mod-buchbinder .bb-l-w-60 {
+    flex: 0 0 calc(60% - 2cqw);
+}
+
+.path-mod-buchbinder .bb-l-w-67 {
+    flex: 0 0 calc(66.667% - 2cqw);
+}
+
+.path-mod-buchbinder .bb-l-w-70 {
+    flex: 0 0 calc(70% - 2cqw);
+}
+
+.path-mod-buchbinder .bb-l-w-75 {
+    flex: 0 0 calc(75% - 2cqw);
+}
+
+.path-mod-buchbinder .bb-l-w-80 {
+    flex: 0 0 calc(80% - 2cqw);
+}
 .path-mod-buchbinder .bb-l-img {
     max-width: 100%;
     height: auto;
@@ -478,11 +517,25 @@
     margin-bottom: 0;
 }
 
-.path-mod-buchbinder .bb-l-callout-tip { border-color: #2e8540; background: #e8f6ec; }
-.path-mod-buchbinder .bb-l-callout-warning { border-color: #e6a700; background: #fff4dc; }
-.path-mod-buchbinder .bb-l-callout-important { border-color: #c00; background: #fde8e8; }
-.path-mod-buchbinder .bb-l-callout-caution { border-color: #e06c00; background: #fff0e0; }
+.path-mod-buchbinder .bb-l-callout-tip {
+    border-color: #2e8540;
+    background: #e8f6ec;
+}
 
+.path-mod-buchbinder .bb-l-callout-warning {
+    border-color: #e6a700;
+    background: #fff4dc;
+}
+
+.path-mod-buchbinder .bb-l-callout-important {
+    border-color: #c00;
+    background: #fde8e8;
+}
+
+.path-mod-buchbinder .bb-l-callout-caution {
+    border-color: #e06c00;
+    background: #fff0e0;
+}
 .path-mod-buchbinder .bb-l-lines {
     margin: 0 0 1em;
 }

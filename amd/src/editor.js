@@ -658,7 +658,12 @@ define(['core/ajax', 'core/notification', 'core/str'], function(Ajax, Notificati
                     });
                     rec.textContent = str.record;
                     var type = self.recorder.mimeType || 'audio/webm';
-                    var ext = type.indexOf('ogg') >= 0 ? 'ogg' : (type.indexOf('mp4') >= 0 ? 'm4a' : 'webm');
+                    var ext = 'webm';
+                    if (type.indexOf('ogg') >= 0) {
+                        ext = 'ogg';
+                    } else if (type.indexOf('mp4') >= 0) {
+                        ext = 'm4a';
+                    }
                     self.uploadAudio(o, new Blob(chunks, {type: type}), 'recording.' + ext, player);
                 };
                 self.recorder.start();
