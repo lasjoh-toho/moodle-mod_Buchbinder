@@ -25,7 +25,7 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'mod_buchbinder';
-$plugin->version   = 2026092500;
+$plugin->version   = 2026092600;
 $plugin->requires  = 2023100900; // Moodle 4.3.
 $plugin->maturity  = MATURITY_ALPHA;
-$plugin->release   = '0.1.0';
+$plugin->release   = '0.2.0';

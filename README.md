@@ -9,7 +9,7 @@ anlegen, eine Textansicht für Smartphones anbieten und papiersparend drucken.
 > Komponentenname: `mod_buchbinder`. Moodle verlangt kleingeschriebene Komponentennamen, daher
 > heißt das Verzeichnis `mod/buchbinder`, obwohl das Repository `moodle-mod_Buchbinder` heißt.
 
-Status: **0.1.0 (Alpha)**. Der gesamte Arbeitsablauf ist umgesetzt; Punkte, die noch fehlen,
+Status: **0.2.0 (Alpha)**. Der gesamte Arbeitsablauf ist umgesetzt; Punkte, die noch fehlen,
 stehen unter [Roadmap](#roadmap).
 
 ## Arbeitsablauf im Publishing Studio
@@ -74,6 +74,12 @@ Aktivitäten können als **Master** angeboten werden. Lehrkräfte, die den Maste
 Kurses. Herkunft (`masterid`, `masterrange`) wird gespeichert; der Master listet, wo er verwendet
 wird. Zusätzlich kann jede Aktivität per `pagerange` nur einen Teil ihrer Seiten veröffentlichen.
 
+### Backup/Restore
+Kurs-Backups, Kursimport und „Duplizieren“ übernehmen Seiten, Quellen, Overlays und alle Dateien
+(Originale, Seitenbilder, eingebettete Bilder, Audio). Doppelseiten bleiben verknüpft,
+Glossar-Overlays zeigen nach der Wiederherstellung auf das wiederhergestellte Glossar des neuen Kurses.
+Die Herkunft aus der Asset Bank bleibt erhalten, sofern der Master auf derselben Website existiert.
+
 ### Eco-Print (`classes/local/eco_print.php`, `imposition.php`)
 1, 2 oder 4 Seiten pro Blatt oder **Broschüre** (Ausschießen für beidseitigen Druck über die kurze
 Kante, Stapel in der Mitte falten). Der **Tintensparmodus** invertiert dunkle Seiten, wandelt in
@@ -86,7 +92,7 @@ Lehrkraft-Version), Überschreibungen und Quellenangaben mitgedruckt.
 - **Content-Harvester-Proxy aktivieren/deaktivieren** (Standard: aus), Bilder übernehmen, Zeitlimit
 
 ## Voraussetzungen
-- Moodle 4.3 oder neuer (getestet mit Moodle 5.0 / PHP 8.4 / PostgreSQL 16)
+- Moodle 4.3 oder neuer – getestet mit **Moodle 4.4** (PHP 8.3) und **Moodle 5.0** (PHP 8.4), jeweils PostgreSQL 16
 - PHP-Erweiterungen `gd`, `zip`, `dom` (Standard in Moodle); optional `imagick` für TIFF
 - Ghostscript für den PDF-Import (Website-Administration → Server → Systempfade → `pathtogs`)
 - Optional ein Dokumentkonverter (z. B. unoconv) für layouttreuen Word-Import
@@ -108,15 +114,13 @@ vendor/bin/phpunit --testsuite mod_buchbinder_testsuite
 ```
 Die Tests decken Seitenbereiche, Ausschießen, Scan-Bereinigung (synthetische Scans), das
 Dokumentmodell (Doppelseiten, Overlays, eingebrannte Abdeckungen, Asset Bank), die Webservices
-inklusive Rechteprüfung, den PDF-Druck in allen Layouts, den Word-Import und die Harvester-Helfer ab.
+inklusive Rechteprüfung, Backup/Restore und Duplizieren, den PDF-Druck in allen Layouts, den Word-Import und die Harvester-Helfer ab.
 
 JavaScript liegt in `amd/src` als AMD-Module; `amd/build/*.min.js` sind unminifizierte Kopien mit
 Modulnamen. Mit `grunt amd` im Moodle-Verzeichnis lassen sich echte Builds erzeugen.
 
 ## Roadmap
 - Layout-System für neue Seiten und das Arrangieren importierter Inhalte (z. B. auf Basis von Quarto)
-- Backup/Restore (`FEATURE_BACKUP_MOODLE2`) – bis dahin werden Buchbinder-Aktivitäten beim
-  Kurs-Backup nicht mitgesichert
 - Texterkennung (OCR), um Reflow-Textblöcke automatisch zu füllen
 - Serverseitiges Text-to-Speech als Alternative zur Browser-Sprachausgabe
 - Rendering großer Importe als Hintergrundaufgabe (ad-hoc Task) statt im Request
