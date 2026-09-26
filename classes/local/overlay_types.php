@@ -36,6 +36,10 @@ class overlay_types {
     const REFLOW = 'reflow';
     /** @var string Column region for zoom anchoring. */
     const COLUMN = 'column';
+    /** @var string Text frame with formatted content (DTP frame). */
+    const TEXTFRAME = 'textframe';
+    /** @var string Image frame (DTP frame). */
+    const IMAGEFRAME = 'imageframe';
 
     /**
      * All overlay types.
@@ -43,7 +47,8 @@ class overlay_types {
      * @return string[]
      */
     public static function all(): array {
-        return [self::TEXTBOX, self::MASK, self::AUDIO, self::GLOSSARY, self::REFLOW, self::COLUMN];
+        return [self::TEXTFRAME, self::IMAGEFRAME, self::TEXTBOX, self::MASK, self::AUDIO, self::GLOSSARY, self::REFLOW,
+            self::COLUMN];
     }
 
     /**
@@ -104,7 +109,32 @@ class overlay_types {
                 ];
             case self::COLUMN:
                 return [];
+            case self::TEXTFRAME:
+                return [
+                    'html' => purify_html((string)($data['html'] ?? '')),
+                    'fontscale' => max(0.5, min(3.0, round((float)($data['fontscale'] ?? 1), 2))),
+                    'bgcolor' => ($data['bgcolor'] ?? '') === '' ? '' : self::color($data['bgcolor'], ''),
+                    'border' => !empty($data['border']),
+                    'columns' => max(1, min(3, (int)($data['columns'] ?? 1))),
+                ];
+            case self::IMAGEFRAME:
+                return [
+                    'filename' => clean_param((string)($data['filename'] ?? ''), PARAM_FILE),
+                    'fit' => ($data['fit'] ?? '') === 'cover' ? 'cover' : 'contain',
+                    'alt' => $text('alt'),
+                    'caption' => $text('caption'),
+                ];
         }
         throw new \invalid_parameter_exception('Unknown overlay type ' . $type);
+    }
+
+    /**
+     * Whether the type is a layout frame (content) rather than an interactive layer.
+     *
+     * @param string $type
+     * @return bool
+     */
+    public static function is_frame(string $type): bool {
+        return in_array($type, [self::TEXTFRAME, self::IMAGEFRAME]);
     }
 }

@@ -14,6 +14,7 @@
         <FIELD NAME="pagerange" TYPE="char" LENGTH="255" NOTNULL="false" SEQUENCE="false" COMMENT="Published excerpt, e.g. 5-12. Empty means all pages."/>
         <FIELD NAME="enablereflow" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="1" SEQUENCE="false"/>
         <FIELD NAME="enableprint" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="1" SEQUENCE="false"/>
+        <FIELD NAME="firstpageright" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="1" SEQUENCE="false" COMMENT="Booklet: page 1 is a right page"/>
         <FIELD NAME="ismaster" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Offered in the asset bank as master document"/>
         <FIELD NAME="masterid" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false" COMMENT="buchbinder.id this document was derived from"/>
         <FIELD NAME="masterrange" TYPE="char" LENGTH="255" NOTNULL="false" SEQUENCE="false" COMMENT="Page range taken from the master"/>

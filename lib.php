@@ -118,7 +118,7 @@ function buchbinder_pluginfile($course, $cm, $context, $filearea, $args, $forced
 
     if ($filearea === 'source') {
         require_capability('mod/buchbinder:edit', $context);
-    } else if (in_array($filearea, ['page', 'pagecontent', 'audio', 'clips'])) {
+    } else if (in_array($filearea, ['page', 'pagecontent', 'audio', 'frameimage', 'clips'])) {
         require_capability('mod/buchbinder:view', $context);
     } else {
         return false;
@@ -133,10 +133,10 @@ function buchbinder_pluginfile($course, $cm, $context, $filearea, $args, $forced
         return false;
     }
     // Pages outside the published excerpt are only visible to editors.
-    if (in_array($filearea, ['page', 'pagecontent', 'audio']) && !has_capability('mod/buchbinder:edit', $context)) {
+    if (in_array($filearea, ['page', 'pagecontent', 'audio', 'frameimage']) && !has_capability('mod/buchbinder:edit', $context)) {
         global $DB;
         $pageid = $itemid;
-        if ($filearea === 'audio') {
+        if ($filearea === 'audio' || $filearea === 'frameimage') {
             $pageid = (int)$DB->get_field('buchbinder_overlay', 'pageid', ['id' => $itemid]);
         }
         $instance = $DB->get_record('buchbinder', ['id' => $cm->instance], '*', MUST_EXIST);
@@ -169,6 +169,14 @@ function buchbinder_extend_settings_navigation(settings_navigation $settings, na
     }
     $context = context_module::instance($cm->id);
     if (has_capability('mod/buchbinder:edit', $context)) {
+        $node->add(
+            get_string('desk', 'mod_buchbinder'),
+            new moodle_url('/mod/buchbinder/desk.php', ['id' => $cm->id]),
+            navigation_node::TYPE_SETTING,
+            null,
+            'buchbinderdesk',
+            new pix_icon('i/edit', '')
+        );
         $node->add(
             get_string('studio', 'mod_buchbinder'),
             new moodle_url('/mod/buchbinder/studio.php', ['id' => $cm->id]),

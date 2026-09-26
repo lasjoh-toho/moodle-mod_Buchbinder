@@ -52,5 +52,15 @@ function xmldb_buchbinder_upgrade($oldversion) {
         upgrade_mod_savepoint(true, 2026092700, 'buchbinder');
     }
 
+    if ($oldversion < 2026092800) {
+        // Booklet layout: side of the first page.
+        $table = new xmldb_table('buchbinder');
+        $field = new xmldb_field('firstpageright', XMLDB_TYPE_INTEGER, '1', null, XMLDB_NOTNULL, null, '1', 'enableprint');
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+        upgrade_mod_savepoint(true, 2026092800, 'buchbinder');
+    }
+
     return true;
 }

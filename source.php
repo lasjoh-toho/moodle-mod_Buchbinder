@@ -44,6 +44,38 @@ $PAGE->set_title(get_string('editsource', 'mod_buchbinder'));
 $PAGE->set_heading(format_string($course->fullname));
 $PAGE->activityheader->disable();
 
+$delete = optional_param('delete', '', PARAM_ALPHA);
+if ($delete !== '') {
+    $pagecount = $DB->count_records('buchbinder_page', ['buchbinderid' => $cm->instance, 'sourceid' => $source->id]);
+    if (in_array($delete, ['withpages', 'keeppages']) && confirm_sesskey()) {
+        $deleted = $document->delete_source($source->id, $delete === 'withpages');
+        redirect($returnurl, get_string('sourcedeleted', 'mod_buchbinder', $deleted));
+    }
+    $params = ['cmid' => $cm->id, 'id' => $source->id, 'sesskey' => sesskey()];
+    echo $OUTPUT->header();
+    echo $OUTPUT->heading(get_string('deletesource', 'mod_buchbinder'));
+    echo $OUTPUT->box(get_string('deletesource_confirm', 'mod_buchbinder', (object)[
+        'title' => format_string($source->title ?: $source->filename), 'pages' => $pagecount]), 'generalbox mb-3');
+    echo html_writer::start_div('d-flex flex-wrap');
+    if ($pagecount) {
+        echo $OUTPUT->single_button(
+            new moodle_url('/mod/buchbinder/source.php', $params + ['delete' => 'withpages']),
+            get_string('deletesource_withpages', 'mod_buchbinder', $pagecount),
+            'post',
+            ['type' => 'danger']
+        );
+    }
+    echo $OUTPUT->single_button(
+        new moodle_url('/mod/buchbinder/source.php', $params + ['delete' => 'keeppages']),
+        get_string($pagecount ? 'deletesource_keeppages' : 'delete', $pagecount ? 'mod_buchbinder' : 'moodle'),
+        'post'
+    );
+    echo $OUTPUT->single_button($returnurl, get_string('cancel'), 'get');
+    echo html_writer::end_div();
+    echo $OUTPUT->footer();
+    exit;
+}
+
 $form = new \mod_buchbinder\form\source_form($url);
 $form->set_data(['cmid' => $cm->id] + (array)$source);
 if ($form->is_cancelled()) {

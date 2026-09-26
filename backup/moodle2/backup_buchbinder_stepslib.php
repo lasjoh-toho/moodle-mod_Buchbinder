@@ -32,7 +32,7 @@ class backup_buchbinder_activity_structure_step extends backup_activity_structur
      */
     protected function define_structure() {
         $buchbinder = new backup_nested_element('buchbinder', ['id'], [
-            'name', 'intro', 'introformat', 'pagerange', 'enablereflow', 'enableprint', 'ismaster', 'masterid',
+            'name', 'intro', 'introformat', 'pagerange', 'enablereflow', 'enableprint', 'firstpageright', 'ismaster', 'masterid',
             'masterrange', 'timecreated', 'timemodified']);
 
         $sources = new backup_nested_element('sources');
@@ -66,6 +66,7 @@ class backup_buchbinder_activity_structure_step extends backup_activity_structur
         $page->annotate_files('mod_buchbinder', 'page', 'id');
         $page->annotate_files('mod_buchbinder', 'pagecontent', 'id');
         $overlay->annotate_files('mod_buchbinder', 'audio', 'id');
+        $overlay->annotate_files('mod_buchbinder', 'frameimage', 'id');
 
         return $this->prepare_activity_structure($buchbinder);
     }

@@ -25,13 +25,13 @@ namespace mod_buchbinder\local;
  */
 class importer {
     /** @var string[] Accepted file extensions. */
-    const ACCEPTED = ['.pdf', '.docx', '.html', '.htm', '.png', '.jpg', '.jpeg', '.gif', '.webp', '.tif', '.tiff',
-        '.cbz', '.zip'];
+    const ACCEPTED = ['.pdf', '.docx', '.html', '.htm', '.md', '.markdown', '.png', '.jpg', '.jpeg', '.gif', '.webp',
+        '.tif', '.tiff', '.cbz', '.zip'];
 
     /** @var document */
     protected $document;
 
-    /** @var array cleanup options: chop, deskew, shadow, split */
+    /** @var array options: chop, deskew, shadow, split (scans), startright (documents start on a right page) */
     protected $ops;
 
     /** @var int */
@@ -70,6 +70,7 @@ class importer {
             'pdf' => 'pdf',
             'docx' => 'docx',
             'html', 'htm' => 'html',
+            'md', 'markdown' => 'md',
             'cbz', 'zip' => 'cbz',
             'tif', 'tiff' => 'tiff',
             'png', 'jpg', 'jpeg', 'gif', 'webp' => 'image',
@@ -97,8 +98,13 @@ class importer {
             case 'docx':
                 return $this->import_docx($file, $sourceid);
             case 'html':
-                $this->document->add_html_page(purify_html(self::html_body($file->get_content())), $sourceid);
-                return 1;
+                $html = self::html_body($file->get_content());
+                return $this->flow(blocks::from_html($html, $this->web_image_resolver($meta['url'] ?? '')), $sourceid);
+            case 'md':
+                return $this->flow(blocks::from_markdown(
+                    $file->get_content(),
+                    $this->web_image_resolver($meta['url'] ?? '')
+                ), $sourceid);
             case 'cbz':
                 return $this->import_archive($file, $sourceid);
             case 'tiff':
@@ -122,6 +128,8 @@ class importer {
             $gutter = image_cleanup::find_gutter($img);
             if ($gutter !== null) {
                 [$left, $right] = image_cleanup::split($img, $gutter);
+                // The left half must lie on a left page of the booklet: add a blank page if necessary.
+                $this->document->pad_to_side(booklet::LEFT);
                 $page = $this->document->add_image_page($left, $sourceid, ['spreadside' => 'left']);
                 global $DB;
                 $DB->set_field('buchbinder_page', 'spreadid', $page->id, ['id' => $page->id]);
@@ -170,32 +178,63 @@ class importer {
     }
 
     /**
-     * Word import: document converter to PDF if available, simple HTML conversion otherwise.
+     * Word import: text, tables and images become frames on booklet pages.
      *
      * @param \stored_file $file
      * @param int $sourceid
      * @return int
      */
     protected function import_docx(\stored_file $file, int $sourceid): int {
-        global $CFG;
-        $converter = new \core_files\converter();
-        if (!empty($CFG->pathtogs) && $converter->can_convert_storedfile_to($file, 'pdf')) {
-            $conversion = $converter->start_conversion($file, 'pdf');
-            $status = $conversion->get('status');
-            if ($status === \core_files\conversion::STATUS_COMPLETE && ($pdf = $conversion->get_destfile())) {
-                return $this->import_pdf($pdf, $sourceid);
-            }
-        }
         $path = $file->copy_content_to_temp();
         try {
-            $pages = docx_reader::to_html_pages($path);
+            $doc = docx_reader::to_html($path);
         } finally {
             @unlink($path);
         }
-        foreach ($pages as $html) {
-            $this->document->add_html_page(purify_html($html), $sourceid);
-        }
-        return count($pages);
+        $media = $doc['media'];
+        return $this->flow(blocks::from_html($doc['html'], fn($src) => $media[$src] ?? null), $sourceid);
+    }
+
+    /**
+     * Place blocks as frames on new pages.
+     *
+     * @param array $blocks
+     * @param int|null $sourceid
+     * @return int number of pages created
+     */
+    public function flow(array $blocks, ?int $sourceid): int {
+        $flow = new flow($this->document, $sourceid);
+        return count($flow->run($blocks, in_array('startright', $this->ops)));
+    }
+
+    /**
+     * Resolver for images of imported html/Markdown: data URIs and, with the harvester enabled,
+     * absolute URLs (relative to the source URL).
+     *
+     * @param string $baseurl
+     * @return callable
+     */
+    public function web_image_resolver(string $baseurl): callable {
+        $maxbytes = document::max_bytes($this->document->get_context());
+        return function (string $src) use ($baseurl, $maxbytes) {
+            if (preg_match('#^data:image/(png|jpe?g|gif|webp);base64,(.+)$#is', $src, $m)) {
+                $data = base64_decode($m[2], true);
+                return $data === false ? null : ['data' => $data, 'filename' => 'image.' . strtolower($m[1])];
+            }
+            if (!harvester::is_enabled() || !get_config('buchbinder', 'harvestimages')) {
+                return null;
+            }
+            $url = $baseurl !== '' ? harvester::absolute_url($baseurl, $src) : (preg_match('#^https?://#i', $src) ? $src : null);
+            if (!$url) {
+                return null;
+            }
+            try {
+                $data = harvester::fetch($url, $maxbytes);
+            } catch (\moodle_exception $e) {
+                return null;
+            }
+            return ['data' => $data, 'filename' => basename(parse_url($url, PHP_URL_PATH) ?: 'image')];
+        };
     }
 
     /**
@@ -291,28 +330,23 @@ class importer {
     }
 
     /**
-     * Store a web or clipboard snippet as html page.
+     * Place a web or clipboard snippet as frames on new pages.
      *
      * @param string $type web or clipboard
      * @param string $html sanitised html
      * @param array $images filename => content, referenced as @@PLUGINFILE@@/filename
      * @param array $meta title, url, author
-     * @return \stdClass page
+     * @param int|null $sourceid existing source record (otherwise one is created)
+     * @return \stdClass first created page
      */
-    public function add_snippet(string $type, string $html, array $images, array $meta): \stdClass {
-        $sourceid = $this->document->add_source($type, $meta);
-        $page = $this->document->add_html_page($html, $sourceid);
-        $fs = get_file_storage();
-        foreach ($images as $filename => $content) {
-            $fs->create_file_from_string([
-                'contextid' => $this->document->get_context()->id,
-                'component' => 'mod_buchbinder',
-                'filearea' => 'pagecontent',
-                'itemid' => $page->id,
-                'filepath' => '/',
-                'filename' => $filename,
-            ], $content);
-        }
-        return $page;
+    public function add_snippet(string $type, string $html, array $images, array $meta, ?int $sourceid = null): \stdClass {
+        $sourceid = $sourceid ?? $this->document->add_source($type, $meta);
+        $resolver = function (string $src) use ($images) {
+            $name = rawurldecode(preg_replace('#^@@PLUGINFILE@@/#', '', $src));
+            return isset($images[$name]) ? ['data' => $images[$name], 'filename' => $name] : null;
+        };
+        $flow = new flow($this->document, $sourceid);
+        $pages = $flow->run(blocks::from_html($html, $resolver), in_array('startright', $this->ops));
+        return $pages[0] ?? $this->document->add_canvas_page(null, ['sourceid' => $sourceid]);
     }
 }

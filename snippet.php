@@ -70,9 +70,28 @@ if ($form->is_cancelled()) {
     redirect($returnurl);
 } else if ($formdata = $form->get_data()) {
     if (!$page) {
-        $page = (new importer($document))->add_snippet('clipboard', '', [], [
+        // New clipboard snippet: the content is placed as frames on booklet pages.
+        $sourceid = $document->add_source('clipboard', [
             'title' => $formdata->title, 'author' => $formdata->author, 'url' => $formdata->url ?: null,
         ]);
+        $formdata = file_postupdate_standard_editor(
+            $formdata,
+            'content',
+            $editoroptions,
+            $context,
+            'mod_buchbinder',
+            'source',
+            $sourceid
+        );
+        $images = [];
+        foreach (get_file_storage()->get_area_files($context->id, 'mod_buchbinder', 'source', $sourceid, 'id', false) as $f) {
+            $images[$f->get_filename()] = $f->get_content();
+        }
+        $firstpage = (new importer($document))->add_snippet('clipboard', $formdata->content, $images, [], $sourceid);
+        redirect(
+            new moodle_url('/mod/buchbinder/desk.php', ['id' => $cm->id, 'pageid' => $firstpage->id]),
+            get_string('changessaved')
+        );
     }
     $formdata = file_postupdate_standard_editor(
         $formdata,

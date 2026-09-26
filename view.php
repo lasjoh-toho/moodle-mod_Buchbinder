@@ -22,6 +22,7 @@
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
+use mod_buchbinder\local\booklet;
 use mod_buchbinder\local\document;
 use mod_buchbinder\local\overlay_types;
 
@@ -53,12 +54,16 @@ $pct = fn($v) => round((float)$v * 100, 4);
 $items = [];
 $hasreflow = false;
 foreach ($pages as $page) {
+    $side = $document->side_at($page->pagenumber);
     $item = [
         'id' => $page->id,
         'number' => $page->pagenumber,
+        'side' => $side,
         'isimage' => $page->pagetype === 'image',
+        'iscanvas' => $page->pagetype === 'canvas',
+        'fixed' => in_array($page->pagetype, ['image', 'canvas']),
         'imageurl' => $page->pagetype === 'image' ? $document->page_image_url($page)->out(false) : '',
-        'html' => $page->pagetype !== 'image' ? $document->page_html($page) : '',
+        'html' => in_array($page->pagetype, ['html', 'layout']) ? $document->page_html($page) : '',
         'ratio' => $page->width ? round($page->height / $page->width * 100, 4) : 141.4286,
         'landscape' => $page->width > $page->height,
         'spreadside' => $page->spreadside,
@@ -99,15 +104,38 @@ foreach ($pages as $page) {
             case overlay_types::REFLOW:
                 $reflow[] = ['y' => (float)$o->y, 'x' => (float)$o->x, 'text' => $s['text'], 'role' => $s['role']];
                 continue 2;
+            case overlay_types::TEXTFRAME:
+                $html = format_text($s['html'], FORMAT_HTML, ['context' => $context]);
+                $ov += ['html' => $html, 'framestyle' => '--bb-scale:' . $s['fontscale'] . ';' .
+                    ($s['bgcolor'] ? 'background:' . $s['bgcolor'] . ';' : '') .
+                    ($s['columns'] > 1 ? 'column-count:' . $s['columns'] . ';' : ''), 'border' => $s['border']];
+                // Text frames are also the content of the text view on smartphones.
+                $reflow[] = ['y' => (float)$o->y, 'x' => (float)$o->x, 'html' => $html];
+                break;
+            case overlay_types::IMAGEFRAME:
+                $url = $document->frame_image_url($o);
+                if (!$url) {
+                    continue 2;
+                }
+                $ov += ['src' => $url->out(false), 'alt' => $s['alt'], 'caption' => $s['caption'],
+                    'cover' => $s['fit'] === 'cover'];
+                $reflow[] = ['y' => (float)$o->y, 'x' => (float)$o->x, 'image' => $url->out(false), 'alt' => $s['alt']];
+                break;
         }
         $item['overlays'][] = $ov;
     }
     // Reading order: columns left to right, top to bottom inside a column.
     usort($reflow, fn($a, $b) => [round($a['x'], 1), $a['y']] <=> [round($b['x'], 1), $b['y']]);
     foreach ($reflow as $block) {
-        $item['reflow'][] = ['text' => $block['text'], 'is' . $block['role'] => true];
+        if (isset($block['html'])) {
+            $item['reflow'][] = ['rhtml' => $block['html']];
+        } else if (isset($block['image'])) {
+            $item['reflow'][] = ['rimage' => $block['image'], 'ralt' => $block['alt']];
+        } else {
+            $item['reflow'][] = ['text' => $block['text'], 'is' . $block['role'] => true];
+        }
     }
-    $item['hasreflow'] = !empty($item['reflow']) || $page->pagetype !== 'image';
+    $item['hasreflow'] = !empty($item['reflow']) || in_array($page->pagetype, ['html', 'layout']);
     $hasreflow = $hasreflow || !empty($item['reflow']);
     if ($page->sourceid && isset($sources[$page->sourceid]) && document::has_citation($sources[$page->sourceid])) {
         $item['citation'] = document::citation($sources[$page->sourceid]);
@@ -115,16 +143,28 @@ foreach ($pages as $page) {
     $items[] = $item;
 }
 
+// Double pages of the booklet side by side.
+$spreads = [];
+foreach (
+    booklet::spreads(
+        array_map(fn($i) => ['position' => $i['number'], 'landscape' => $i['landscape']] + $i, $items),
+        $document->first_page_right()
+    ) as $row
+) {
+    $spreads[] = ['pages' => $row, 'double' => count($row) === 2,
+        'single' => count($row) === 1 ? $row[0]['side'] : ''];
+}
+
 $PAGE->requires->js_call_amd('mod_buchbinder/viewer', 'init', ['#buchbinder-viewer-' . $cm->id, $cm->id]);
 
 echo $OUTPUT->header();
 echo $OUTPUT->render_from_template('mod_buchbinder/view', [
     'cmid' => $cm->id,
-    'pages' => $items,
+    'spreads' => $spreads,
     'haspages' => !empty($items),
     'reflow' => $instance->enablereflow && $hasreflow,
     'printurl' => $instance->enableprint && has_capability('mod/buchbinder:print', $context)
         ? (new moodle_url('/mod/buchbinder/print.php', ['id' => $cm->id]))->out(false) : '',
-    'studiourl' => $canedit ? (new moodle_url('/mod/buchbinder/studio.php', ['id' => $cm->id]))->out(false) : '',
+    'studiourl' => $canedit ? (new moodle_url('/mod/buchbinder/desk.php', ['id' => $cm->id]))->out(false) : '',
 ]);
 echo $OUTPUT->footer();

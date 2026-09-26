@@ -20,7 +20,7 @@
     Provenance of imported content.
 
     Example context (json):
-    {"hassources": true, "sources": [{"type": "Web", "title": "Wikipedia", "citation": "Wikipedia, accessed 1 May", "showcitation": true, "editurl": "#"}]}
+    {"hassources": true, "sources": [{"type": "Web", "title": "Wikipedia", "citation": "Wikipedia, accessed 1 May", "showcitation": true, "editurl": "#", "deleteurl": "#", "pages": 3}]}
 }}
 {{^hassources}}
     <div class="alert alert-info">{{#str}}nosources, mod_buchbinder{{/str}}</div>
@@ -32,6 +32,7 @@
             <th>{{#str}}sourcetype, mod_buchbinder{{/str}}</th>
             <th>{{#str}}sourcetitle, mod_buchbinder{{/str}}</th>
             <th>{{#str}}citation, mod_buchbinder{{/str}}</th>
+            <th>{{#str}}pages, mod_buchbinder{{/str}}</th>
             <th></th>
         </tr>
     </thead>
@@ -41,7 +42,11 @@
             <td>{{type}}</td>
             <td>{{title}}</td>
             <td>{{#showcitation}}{{{citation}}}{{/showcitation}}{{^showcitation}}<span class="text-muted">{{#str}}nocitation, mod_buchbinder{{/str}}</span>{{/showcitation}}</td>
-            <td><a class="btn btn-sm btn-secondary" href="{{editurl}}">{{#str}}edit{{/str}}</a></td>
+            <td>{{pages}}</td>
+            <td class="text-nowrap">
+                <a class="btn btn-sm btn-secondary" href="{{editurl}}">{{#str}}edit{{/str}}</a>
+                <a class="btn btn-sm btn-outline-danger" href="{{deleteurl}}">{{#str}}delete{{/str}}</a>
+            </td>
         </tr>
     {{/sources}}
     </tbody>

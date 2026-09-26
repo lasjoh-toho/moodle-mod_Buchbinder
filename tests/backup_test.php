@@ -50,10 +50,11 @@ final class backup_test extends \advanced_testcase {
         $document = document::from_cmid($instance->cmid);
         $importer = new importer($document);
         $importer->add_blank_pages('lined', 2, false);
+        $img = imagecreatetruecolor(40, 30);
         $importer->add_snippet(
             'web',
-            '<p>Text <img src="@@PLUGINFILE@@/a.png"></p>',
-            ['a.png' => 'png'],
+            '<p>Text</p><p><img src="@@PLUGINFILE@@/a.png" alt="Bild"></p>',
+            ['a.png' => local\image_cleanup::to_png($img)],
             ['title' => 'Quelle', 'url' => 'https://example.org']
         );
         [$p1, $p2] = array_keys($document->get_pages());
@@ -79,19 +80,16 @@ final class backup_test extends \advanced_testcase {
         $this->assertEquals($pages[0]->id, $pages[1]->spreadid);
         $this->assertSame('right', $pages[1]->spreadside);
         $this->assertNotNull($document->get_page_file($pages[0]));
-        // The html page keeps its source and embedded file.
-        $this->assertSame('html', $pages[2]->pagetype);
+        // The snippet page keeps its source, its text frame and its image frame with the image.
+        $this->assertSame('canvas', $pages[2]->pagetype);
         $sources = $document->get_sources();
         $this->assertSame('Quelle', $sources[$pages[2]->sourceid]->title);
+        $frames = $document->get_overlays([$pages[2]->id])[$pages[2]->id];
+        $types = array_map(fn($f) => $f->overlaytype, $frames);
+        $this->assertSame(['textframe', 'imageframe'], $types);
+        $this->assertStringContainsString('Text', $frames[0]->settings['html']);
+        $this->assertNotNull($document->frame_image_file($frames[1]));
         $fs = get_file_storage();
-        $this->assertTrue($fs->file_exists(
-            $document->get_context()->id,
-            'mod_buchbinder',
-            'pagecontent',
-            $pages[2]->id,
-            '/',
-            'a.png'
-        ));
 
         $overlays = $document->get_overlays([$pages[0]->id, $pages[1]->id]);
         $this->assertEquals($glossaryid, $overlays[$pages[0]->id][0]->settings['glossaryid']);

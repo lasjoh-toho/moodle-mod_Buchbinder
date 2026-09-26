@@ -29,15 +29,26 @@ define(['core/ajax', 'core/notification', 'core/str'], function(Ajax, Notificati
         'align_right', 'maskstyle', 'mask_white', 'mask_black', 'revealable', 'label', 'audiosource', 'audio_file',
         'audio_tts', 'record', 'stoprecording', 'uploadaudio', 'ttstext', 'ttslang', 'preview', 'glossary', 'term',
         'reflowrole', 'role_p', 'role_h2', 'role_h3', 'role_li', 'columnhelp', 'save', 'deleteoverlay', 'saved',
-        'nocolumnsfound', 'columnsfound', 'audiosaved', 'errorfiletoolarge', 'selectoverlay', 'clipcreated'
+        'nocolumnsfound', 'columnsfound', 'audiosaved', 'errorfiletoolarge', 'selectoverlay', 'clipcreated',
+        'overlay_textframe', 'overlay_imageframe', 'fontscale', 'textcolumns', 'frameborder', 'nobackground', 'uploadimage',
+        'imagefit', 'fit_contain', 'fit_cover', 'alttext', 'caption', 'edittext', 'italic', 'role_h2', 'role_h3',
+        'paragraph', 'bulletlist', 'numberedlist', 'overset', 'imagesaved', 'confirmdeletepage', 'newframetext'
     ];
 
     var Editor = function(root) {
         this.root = root;
         this.config = JSON.parse(root.dataset.config);
-        this.stage = root.querySelector('.bb-editor-stage');
+        this.stages = {};
+        root.querySelectorAll('.bb-editor-stage').forEach(function(stage) {
+            this.stages[stage.dataset.pageid] = stage;
+        }.bind(this));
+        this.pages = {};
+        (this.config.pages || []).forEach(function(page) {
+            this.pages[page.pageid] = page;
+        }.bind(this));
+        this.currentPage = Object.keys(this.stages)[0];
         this.panel = root.querySelector('.bb-editor-panel');
-        this.image = this.stage.querySelector('img.bb-image');
+        this.editing = null;
         this.tool = 'select';
         this.overlays = {};
         this.selected = null;
@@ -64,12 +75,47 @@ define(['core/ajax', 'core/notification', 'core/str'], function(Ajax, Notificati
 
     // Geometry helpers.
 
-    Editor.prototype.relPoint = function(e) {
-        var r = this.stage.getBoundingClientRect();
-        return {
-            x: Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)),
-            y: Math.max(0, Math.min(1, (e.clientY - r.top) / r.height))
-        };
+    Editor.prototype.relPoint = function(e, stage, noclamp) {
+        var r = stage.getBoundingClientRect();
+        var x = (e.clientX - r.left) / r.width;
+        var y = (e.clientY - r.top) / r.height;
+        return noclamp ? {x: x, y: y} : {x: Math.max(0, Math.min(1, x)), y: Math.max(0, Math.min(1, y))};
+    };
+
+    Editor.prototype.imageOf = function(pageid) {
+        var stage = this.stages[pageid];
+        return stage ? stage.querySelector('img.bb-image') : null;
+    };
+
+    /**
+     * Snap a value to the guides (type area, page edges and centre) of a page.
+     *
+     * @param {number} value
+     * @param {string} axis x or y
+     * @param {string} pageid
+     * @returns {number|null} snapped value or null
+     */
+    Editor.prototype.snap = function(value, axis, pageid) {
+        var page = this.pages[pageid];
+        var targets = [0, 1];
+        if (axis === 'x') {
+            targets.push(0.5);
+        }
+        if (page && page.guides) {
+            var g = page.guides;
+            if (axis === 'x') {
+                targets.push(g[0], g[0] + g[2]);
+            } else {
+                targets.push(g[1], g[1] + g[3]);
+            }
+        }
+        var best = null;
+        targets.forEach(function(t) {
+            if (Math.abs(t - value) < 0.008 && (best === null || Math.abs(t - value) < Math.abs(best - value))) {
+                best = t;
+            }
+        });
+        return best;
     };
 
     Editor.prototype.place = function(el, o) {
@@ -92,38 +138,91 @@ define(['core/ajax', 'core/notification', 'core/str'], function(Ajax, Notificati
         var label = document.createElement('span');
         label.className = 'bb-edit-label';
         el.appendChild(label);
-        this.stage.appendChild(el);
+        if (o.type === 'textframe' || o.type === 'imageframe') {
+            var content = document.createElement('div');
+            content.className = 'bb-frame-content' + (o.type === 'textframe' ? ' bb-textframe' : '');
+            el.insertBefore(content, handle);
+        }
+        o.pageid = String(o.pageid || this.currentPage);
+        (this.stages[o.pageid] || this.stages[this.currentPage]).appendChild(el);
         o.el = el;
         this.overlays[o.id] = o;
         this.refresh(o);
         return el;
     };
 
-    Editor.prototype.refresh = function(o) {
-        var s = o.settings || {};
-        var label = o.el.querySelector('.bb-edit-label');
-        this.place(o.el, o);
-        o.el.style.background = '';
-        o.el.style.color = '';
-        o.el.style.removeProperty('--bb-fs');
-        if (o.type === 'textbox') {
+    /**
+     * Renderers of the overlay types in the editor.
+     */
+    var RENDER = {
+        textbox: function(o, s, label) {
             label.textContent = s.text || '';
             o.el.style.background = s.bgcolor || '#ffffff';
             o.el.style.color = s.color || '#000000';
             o.el.style.setProperty('--bb-fs', s.fontsize || 16);
             o.el.style.fontWeight = s.bold ? 'bold' : 'normal';
             o.el.style.textAlign = s.align || 'left';
-        } else if (o.type === 'mask') {
+        },
+        mask: function(o, s, label) {
             label.textContent = s.label || '';
             o.el.classList.toggle('bb-mask-black', s.style === 'black');
-        } else if (o.type === 'audio') {
-            label.textContent = '♪ ' + (s.label || (s.mode === 'tts' ? s.ttstext : s.filename) || '');
-        } else if (o.type === 'glossary') {
+        },
+        audio: function(o, s, label) {
+            var detail = s.mode === 'tts' ? s.ttstext : s.filename;
+            label.textContent = '♪ ' + (s.label || detail || '');
+        },
+        glossary: function(o, s, label) {
             label.textContent = s.term || '';
-        } else if (o.type === 'reflow') {
+        },
+        reflow: function(o, s, label) {
             label.textContent = '¶ ' + (s.text || '').substring(0, 60);
-        } else if (o.type === 'column') {
+        },
+        column: function(o, s, label) {
             label.textContent = this.str.overlay_column;
+        },
+        textframe: function(o, s) {
+            var content = o.el.querySelector('.bb-frame-content');
+            if (this.editing !== o) {
+                // The html was cleaned on the server (purify_html) when it was saved.
+                content.innerHTML = s.html || '';
+            }
+            o.el.style.setProperty('--bb-scale', s.fontscale || 1);
+            o.el.style.background = s.bgcolor || '';
+            o.el.style.columnCount = s.columns > 1 ? s.columns : '';
+            o.el.classList.toggle('bb-frame-border', !!s.border);
+            this.checkOverset(o);
+        },
+        imageframe: function(o, s, label) {
+            var box = o.el.querySelector('.bb-frame-content');
+            box.replaceChildren();
+            if (!o.imageurl) {
+                label.textContent = this.str.uploadimage;
+                return;
+            }
+            var img = document.createElement('img');
+            img.src = o.imageurl;
+            img.alt = s.alt || '';
+            img.draggable = false;
+            img.className = s.fit === 'cover' ? 'bb-cover' : '';
+            box.appendChild(img);
+        }
+    };
+
+    Editor.prototype.refresh = function(o) {
+        this.place(o.el, o);
+        o.el.style.background = '';
+        o.el.style.color = '';
+        o.el.style.removeProperty('--bb-fs');
+        if (RENDER[o.type]) {
+            RENDER[o.type].call(this, o, o.settings || {}, o.el.querySelector('.bb-edit-label'));
+        }
+    };
+
+    Editor.prototype.checkOverset = function(o) {
+        var content = o.el.querySelector('.bb-frame-content');
+        if (content) {
+            o.el.classList.toggle('bb-overset', content.scrollHeight > o.el.clientHeight + 2);
+            o.el.title = o.el.classList.contains('bb-overset') ? this.str.overset : '';
         }
     };
 
@@ -146,7 +245,7 @@ define(['core/ajax', 'core/notification', 'core/str'], function(Ajax, Notificati
             methodname: 'mod_buchbinder_save_overlay',
             args: {
                 cmid: this.config.cmid,
-                pageid: this.config.pageid,
+                pageid: parseInt(o.pageid, 10),
                 overlayid: o.id > 0 ? o.id : 0,
                 overlaytype: o.type,
                 x: o.x, y: o.y, w: o.w, h: o.h,
@@ -181,16 +280,17 @@ define(['core/ajax', 'core/notification', 'core/str'], function(Ajax, Notificati
     // Colour matched type-over: estimate the paper colour on the border of the box.
 
     Editor.prototype.sampleBackground = function(o) {
-        if (!this.image || !this.image.naturalWidth) {
+        var image = this.imageOf(o.pageid);
+        if (!image || !image.naturalWidth) {
             return '#ffffff';
         }
-        var iw = this.image.naturalWidth;
-        var ih = this.image.naturalHeight;
+        var iw = image.naturalWidth;
+        var ih = image.naturalHeight;
         var canvas = document.createElement('canvas');
         canvas.width = iw;
         canvas.height = ih;
         var ctx = canvas.getContext('2d', {willReadFrequently: true});
-        ctx.drawImage(this.image, 0, 0);
+        ctx.drawImage(image, 0, 0);
         var x0 = Math.floor(o.x * iw);
         var y0 = Math.floor(o.y * ih);
         var x1 = Math.min(iw - 1, Math.ceil((o.x + o.w) * iw));
@@ -230,16 +330,19 @@ define(['core/ajax', 'core/notification', 'core/str'], function(Ajax, Notificati
 
     Editor.prototype.detectColumns = function() {
         var self = this;
-        if (!this.image || !this.image.naturalWidth) {
+        var pageid = this.currentPage;
+        var image = this.imageOf(pageid);
+        if (!image || !image.naturalWidth) {
+            Notification.addNotification({message: this.str.nocolumnsfound, type: 'info'});
             return;
         }
         var w = 400;
-        var h = Math.round(w * this.image.naturalHeight / this.image.naturalWidth);
+        var h = Math.round(w * image.naturalHeight / image.naturalWidth);
         var canvas = document.createElement('canvas');
         canvas.width = w;
         canvas.height = h;
         var ctx = canvas.getContext('2d', {willReadFrequently: true});
-        ctx.drawImage(this.image, 0, 0, w, h);
+        ctx.drawImage(image, 0, 0, w, h);
         var data = ctx.getImageData(0, 0, w, h).data;
         var ink = new Array(w).fill(0);
         var rowink = new Array(h).fill(0);
@@ -288,7 +391,7 @@ define(['core/ajax', 'core/notification', 'core/str'], function(Ajax, Notificati
             return v > 0;
         });
         var promises = merged.map(function(r) {
-            var o = {id: -Date.now() - r[0], type: 'column', settings: {},
+            var o = {id: -Date.now() - r[0], type: 'column', settings: {}, pageid: pageid,
                 x: Math.max(0, (r[0] - 2) / w), y: Math.max(0, (top - 4) / h),
                 w: Math.min(1, (r[1] - r[0] + 4) / w), h: Math.min(1, (bottom - top + 8) / h)};
             self.addElement(o);
@@ -305,15 +408,19 @@ define(['core/ajax', 'core/notification', 'core/str'], function(Ajax, Notificati
     Editor.prototype.bindEvents = function() {
         var self = this;
         var drag = null;
+        var lastdown = {o: null, time: 0};
 
         this.root.querySelectorAll('[data-tool]').forEach(function(btn) {
             btn.addEventListener('click', function() {
+                self.stopEditing();
                 self.tool = btn.dataset.tool;
                 self.root.querySelectorAll('[data-tool]').forEach(function(b) {
                     b.classList.toggle('active', b === btn);
                     b.setAttribute('aria-pressed', b === btn ? 'true' : 'false');
                 });
-                self.stage.classList.toggle('bb-drawing', self.tool !== 'select');
+                Object.values(self.stages).forEach(function(stage) {
+                    stage.classList.toggle('bb-drawing', self.tool !== 'select');
+                });
             });
         });
         var detect = this.root.querySelector('[data-action="detect-columns"]');
@@ -322,53 +429,151 @@ define(['core/ajax', 'core/notification', 'core/str'], function(Ajax, Notificati
                 self.detectColumns();
             });
         }
-
-        this.stage.addEventListener('pointerdown', function(e) {
-            if (e.button !== 0) {
-                return;
-            }
-            var target = e.target.closest('.bb-edit-overlay');
-            var p = self.relPoint(e);
-            if (target && self.tool === 'select') {
-                var o = self.overlays[target.dataset.id];
-                self.select(o);
-                drag = {mode: e.target.classList.contains('bb-resize') ? 'resize' : 'move', o: o, start: p,
-                    orig: {x: o.x, y: o.y, w: o.w, h: o.h}, moved: false};
-            } else if (self.tool !== 'select') {
-                var n = {id: -Date.now(), type: self.tool, x: p.x, y: p.y, w: 0, h: 0, settings: self.defaults(self.tool)};
-                self.addElement(n);
-                drag = {mode: 'draw', o: n, start: p, moved: false};
-            } else {
-                self.select(null);
-                return;
-            }
-            self.stage.setPointerCapture(e.pointerId);
-            e.preventDefault();
+        var zoom = this.root.querySelector('[data-action="zoom"]');
+        if (zoom) {
+            zoom.addEventListener('input', function() {
+                self.root.style.setProperty('--bb-desk-zoom', zoom.value / 100);
+            });
+        }
+        this.root.querySelectorAll('[data-action="confirm-delete"]').forEach(function(link) {
+            link.addEventListener('click', function(e) {
+                // eslint-disable-next-line no-alert
+                if (!window.confirm(self.str.confirmdeletepage)) {
+                    e.preventDefault();
+                }
+            });
         });
 
-        this.stage.addEventListener('pointermove', function(e) {
-            if (!drag) {
-                return;
+        Object.values(this.stages).forEach(function(stage) {
+            stage.addEventListener('pointerdown', function(e) {
+                if (e.button !== 0 || e.target.closest('[contenteditable="true"]')) {
+                    return;
+                }
+                self.currentPage = stage.dataset.pageid;
+                var target = e.target.closest('.bb-edit-overlay');
+                var p = self.relPoint(e, stage);
+                if (target && self.tool === 'select') {
+                    var o = self.overlays[target.dataset.id];
+                    // Second click on the same text frame: edit the text (pointer capture swallows dblclick).
+                    var now = Date.now();
+                    if (o.type === 'textframe' && lastdown.o === o && now - lastdown.time < 450) {
+                        lastdown = {o: null, time: 0};
+                        self.startEditing(o);
+                        e.preventDefault();
+                        return;
+                    }
+                    lastdown = {o: o, time: now};
+                    if (self.editing === o) {
+                        return;
+                    }
+                    self.stopEditing();
+                    self.select(o);
+                    drag = {mode: e.target.classList.contains('bb-resize') ? 'resize' : 'move', o: o, start: p,
+                        stage: stage, orig: {x: o.x, y: o.y, w: o.w, h: o.h}, moved: false};
+                } else if (self.tool !== 'select') {
+                    self.stopEditing();
+                    var n = {id: -Date.now(), type: self.tool, pageid: stage.dataset.pageid, x: p.x, y: p.y, w: 0, h: 0,
+                        settings: self.defaults(self.tool)};
+                    self.addElement(n);
+                    drag = {mode: 'draw', o: n, start: p, stage: stage, moved: false};
+                } else {
+                    self.stopEditing();
+                    self.select(null);
+                    return;
+                }
+                stage.setPointerCapture(e.pointerId);
+                e.preventDefault();
+            });
+
+            stage.addEventListener('pointermove', function(e) {
+                if (!drag || drag.stage !== stage) {
+                    return;
+                }
+                var o = drag.o;
+                var p = self.relPoint(e, stage, drag.mode === 'move');
+                var dx = p.x - drag.start.x;
+                var dy = p.y - drag.start.y;
+                drag.moved = drag.moved || Math.abs(dx) + Math.abs(dy) > 0.003;
+                var snapped;
+                if (drag.mode === 'draw') {
+                    o.x = Math.min(p.x, drag.start.x);
+                    o.y = Math.min(p.y, drag.start.y);
+                    o.w = Math.abs(dx);
+                    o.h = Math.abs(dy);
+                } else if (drag.mode === 'move') {
+                    // Frames may be dragged across the fold onto the other page of the double page.
+                    o.x = drag.orig.x + dx;
+                    o.y = Math.max(0, Math.min(1 - o.h, drag.orig.y + dy));
+                    snapped = self.snap(o.x, 'x', o.pageid);
+                    if (snapped !== null) {
+                        o.x = snapped;
+                    } else if ((snapped = self.snap(o.x + o.w, 'x', o.pageid)) !== null) {
+                        o.x = snapped - o.w;
+                    }
+                    if ((snapped = self.snap(o.y, 'y', o.pageid)) !== null) {
+                        o.y = snapped;
+                    } else if ((snapped = self.snap(o.y + o.h, 'y', o.pageid)) !== null) {
+                        o.y = snapped - o.h;
+                    }
+                } else {
+                    o.w = Math.max(0.01, Math.min(1 - o.x, drag.orig.w + dx));
+                    o.h = Math.max(0.01, Math.min(1 - o.y, drag.orig.h + dy));
+                    if ((snapped = self.snap(o.x + o.w, 'x', o.pageid)) !== null) {
+                        o.w = snapped - o.x;
+                    }
+                    if ((snapped = self.snap(o.y + o.h, 'y', o.pageid)) !== null) {
+                        o.h = snapped - o.y;
+                    }
+                }
+                self.place(o.el, o);
+                if (o.type === 'textframe') {
+                    self.checkOverset(o);
+                }
+            });
+
+            stage.addEventListener('pointerup', function(e) {
+                end(e);
+            });
+            stage.addEventListener('pointercancel', function(e) {
+                end(e);
+            });
+
+            stage.addEventListener('dblclick', function(e) {
+                var target = e.target.closest('.bb-type-textframe');
+                if (target && self.tool === 'select') {
+                    self.startEditing(self.overlays[target.dataset.id]);
+                }
+            });
+        });
+
+        /**
+         * Move a frame to the page under its centre (other half of the double page).
+         *
+         * @param {Object} o
+         */
+        var rehome = function(o) {
+            var r = o.el.getBoundingClientRect();
+            var cx = r.left + r.width / 2;
+            var cy = r.top + r.height / 2;
+            var target = null;
+            Object.values(self.stages).forEach(function(stage) {
+                var sr = stage.getBoundingClientRect();
+                if (cx >= sr.left && cx <= sr.right && cy >= sr.top && cy <= sr.bottom) {
+                    target = stage;
+                }
+            });
+            if (target && target.dataset.pageid !== String(o.pageid)) {
+                var tr = target.getBoundingClientRect();
+                o.x = (r.left - tr.left) / tr.width;
+                o.y = (r.top - tr.top) / tr.height;
+                o.pageid = target.dataset.pageid;
+                target.appendChild(o.el);
+                self.currentPage = o.pageid;
             }
-            var p = self.relPoint(e);
-            var o = drag.o;
-            var dx = p.x - drag.start.x;
-            var dy = p.y - drag.start.y;
-            drag.moved = drag.moved || Math.abs(dx) + Math.abs(dy) > 0.003;
-            if (drag.mode === 'draw') {
-                o.x = Math.min(p.x, drag.start.x);
-                o.y = Math.min(p.y, drag.start.y);
-                o.w = Math.abs(dx);
-                o.h = Math.abs(dy);
-            } else if (drag.mode === 'move') {
-                o.x = Math.max(0, Math.min(1 - o.w, drag.orig.x + dx));
-                o.y = Math.max(0, Math.min(1 - o.h, drag.orig.y + dy));
-            } else {
-                o.w = Math.max(0.01, Math.min(1 - o.x, drag.orig.w + dx));
-                o.h = Math.max(0.01, Math.min(1 - o.y, drag.orig.h + dy));
-            }
+            o.x = Math.max(0, Math.min(1 - o.w, o.x));
+            o.y = Math.max(0, Math.min(1 - o.h, o.y));
             self.place(o.el, o);
-        });
+        };
 
         var end = function() {
             if (!drag) {
@@ -390,17 +595,21 @@ define(['core/ajax', 'core/notification', 'core/str'], function(Ajax, Notificati
                 }
                 self.save(d.o).then(function(o) {
                     self.select(o);
+                    if (o.type === 'textframe') {
+                        self.startEditing(o);
+                    }
                     return null;
                 }).catch(Notification.exception);
             } else if (d.moved) {
+                if (d.mode === 'move') {
+                    rehome(d.o);
+                }
                 self.save(d.o).catch(Notification.exception);
             }
         };
-        this.stage.addEventListener('pointerup', end);
-        this.stage.addEventListener('pointercancel', end);
 
         this.root.addEventListener('keydown', function(e) {
-            if (!self.selected || e.target.closest('input, textarea, select')) {
+            if (!self.selected || e.target.closest('input, textarea, select, [contenteditable="true"]')) {
                 return;
             }
             var o = self.selected;
@@ -420,9 +629,9 @@ define(['core/ajax', 'core/notification', 'core/str'], function(Ajax, Notificati
                 e.preventDefault();
             }
         });
-        this.stage.addEventListener('focusin', function(e) {
+        this.root.addEventListener('focusin', function(e) {
             var target = e.target.closest('.bb-edit-overlay');
-            if (target && self.overlays[target.dataset.id] !== self.selected) {
+            if (target && !self.editing && self.overlays[target.dataset.id] !== self.selected) {
                 self.select(self.overlays[target.dataset.id]);
             }
         });
@@ -434,7 +643,7 @@ define(['core/ajax', 'core/notification', 'core/str'], function(Ajax, Notificati
         var self = this;
         Ajax.call([{
             methodname: 'mod_buchbinder_create_clip',
-            args: {cmid: this.config.cmid, pageid: this.config.pageid, x: o.x, y: o.y, w: o.w, h: o.h}
+            args: {cmid: this.config.cmid, pageid: parseInt(o.pageid, 10), x: o.x, y: o.y, w: o.w, h: o.h}
         }])[0].then(function(result) {
             Notification.addNotification({
                 message: self.str.clipcreated.replace('{$a}', result.markdown),
@@ -446,6 +655,10 @@ define(['core/ajax', 'core/notification', 'core/str'], function(Ajax, Notificati
 
     Editor.prototype.defaults = function(type) {
         switch (type) {
+            case 'textframe':
+                return {html: '<p>' + this.str.newframetext + '</p>', fontscale: 1, bgcolor: '', border: false, columns: 1};
+            case 'imageframe':
+                return {fit: 'contain', alt: '', caption: ''};
             case 'textbox':
                 return {text: '', fontsize: 16, color: '#000000', bgcolor: '#ffffff', bold: false, align: 'left'};
             case 'mask':
@@ -458,6 +671,134 @@ define(['core/ajax', 'core/notification', 'core/str'], function(Ajax, Notificati
                 return {text: '', role: 'p'};
             default:
                 return {};
+        }
+    };
+
+    // Text frames: editing in place.
+
+    Editor.prototype.startEditing = function(o) {
+        if (!o || o.type !== 'textframe' || this.editing === o) {
+            return;
+        }
+        this.stopEditing();
+        var self = this;
+        var content = o.el.querySelector('.bb-frame-content');
+        this.select(o);
+        this.editing = o;
+        o.el.classList.add('bb-editing');
+        content.contentEditable = 'true';
+        content.focus();
+        content.addEventListener('input', this.onInput = function() {
+            self.checkOverset(o);
+        });
+    };
+
+    Editor.prototype.stopEditing = function() {
+        var o = this.editing;
+        if (!o) {
+            return;
+        }
+        var content = o.el.querySelector('.bb-frame-content');
+        content.contentEditable = 'false';
+        content.removeEventListener('input', this.onInput);
+        o.el.classList.remove('bb-editing');
+        this.editing = null;
+        if (content.innerHTML !== o.settings.html) {
+            o.settings.html = content.innerHTML;
+            this.save(o).catch(Notification.exception);
+        }
+    };
+
+    Editor.prototype.format = function(command, value) {
+        if (this.editing) {
+            this.editing.el.querySelector('.bb-frame-content').focus();
+            document.execCommand(command, false, value);
+            this.checkOverset(this.editing);
+        }
+    };
+
+    Editor.prototype.uploadFrameImage = function(o, file) {
+        var self = this;
+        if (this.config.maxbytes > 0 && file.size > this.config.maxbytes) {
+            Notification.alert('', this.str.errorfiletoolarge);
+            return;
+        }
+        var reader = new FileReader();
+        reader.onload = function() {
+            Ajax.call([{
+                methodname: 'mod_buchbinder_save_frame_image',
+                args: {cmid: self.config.cmid, overlayid: o.id, filename: file.name,
+                    content: String(reader.result).split(',')[1] || ''}
+            }])[0].then(function(result) {
+                o.imageurl = result.url;
+                o.settings = JSON.parse(result.settings);
+                o.el.querySelector('.bb-edit-label').textContent = '';
+                self.refresh(o);
+                Notification.addNotification({message: self.str.imagesaved, type: 'success'});
+                return null;
+            }).catch(Notification.exception);
+        };
+        reader.readAsDataURL(file);
+    };
+
+    Editor.prototype.renderFramePanel = function(body, o, read) {
+        var self = this;
+        var str = this.str;
+        var s = o.settings;
+        if (o.type === 'textframe') {
+            var tools = document.createElement('div');
+            tools.className = 'bb-format-tools mb-2';
+            [['bold', 'B', null], ['italic', 'I', null], ['formatBlock', str.role_h2, 'h2'], ['formatBlock', str.role_h3, 'h3'],
+                ['formatBlock', str.paragraph, 'p'], ['insertUnorderedList', '•', null],
+                ['insertOrderedList', '1.', null]].forEach(function(t) {
+                var b = self.button(tools, t[1], 'btn-outline-secondary', function() {
+                    self.startEditing(o);
+                    self.format(t[0], t[2]);
+                });
+                var titles = {bold: str.bold, italic: str.italic};
+                b.title = titles[t[0]] || t[1];
+                b.addEventListener('mousedown', function(e) {
+                    // Keep the text selection in the frame.
+                    e.preventDefault();
+                });
+            });
+            body.appendChild(tools);
+            this.button(body, str.edittext, 'btn-outline-primary', function() {
+                self.startEditing(o);
+            });
+            var scale = this.field(body, str.fontscale, this.input('number', s.fontscale));
+            scale.min = 0.5;
+            scale.max = 3;
+            scale.step = 0.05;
+            var cols = this.field(body, str.textcolumns, this.selectInput([[1, '1'], [2, '2'], [3, '3']], s.columns));
+            var nobg = this.field(body, str.nobackground, this.input('checkbox', !s.bgcolor));
+            var bg = this.field(body, str.bgcolor, this.input('color', s.bgcolor || '#ffffff'));
+            var border = this.field(body, str.frameborder, this.input('checkbox', s.border));
+            read.push(function() {
+                self.stopEditing();
+                s.fontscale = parseFloat(scale.value) || 1;
+                s.columns = parseInt(cols.value, 10) || 1;
+                s.bgcolor = nobg.checked ? '' : bg.value;
+                s.border = border.checked;
+            });
+        } else {
+            var upload = this.input('file');
+            upload.accept = 'image/*';
+            this.field(body, str.uploadimage, upload);
+            upload.addEventListener('change', function() {
+                if (upload.files.length) {
+                    self.uploadFrameImage(o, upload.files[0]);
+                }
+            });
+            var fit = this.field(body, str.imagefit, this.selectInput([['contain', str.fit_contain],
+                ['cover', str.fit_cover]], s.fit));
+            var alt = this.field(body, str.alttext, this.input('text', s.alt));
+            var caption = this.field(body, str.caption, this.input('text', s.caption));
+            read.push(function() {
+                s.fit = fit.value;
+                s.alt = alt.value;
+                s.caption = caption.value;
+            });
         }
     };
 
@@ -545,7 +886,9 @@ define(['core/ajax', 'core/notification', 'core/str'], function(Ajax, Notificati
         body.appendChild(title);
         var read = [];
 
-        if (o.type === 'textbox') {
+        if (o.type === 'textframe' || o.type === 'imageframe') {
+            this.renderFramePanel(body, o, read);
+        } else if (o.type === 'textbox') {
             var text = this.field(body, str.text, this.input('textarea', s.text));
             var size = this.field(body, str.fontsize, this.input('number', s.fontsize));
             size.min = 6;
@@ -620,7 +963,7 @@ define(['core/ajax', 'core/notification', 'core/str'], function(Ajax, Notificati
         });
         this.panel.replaceChildren(body);
         var first = body.querySelector('input, textarea, select');
-        if (first) {
+        if (first && !this.editing) {
             first.focus();
         }
     };

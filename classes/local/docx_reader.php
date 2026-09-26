@@ -30,6 +30,15 @@ class docx_reader {
     /** @var string WordprocessingML namespace. */
     const NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
 
+    /** @var string DrawingML namespace. */
+    const NS_A = 'http://schemas.openxmlformats.org/drawingml/2006/main';
+
+    /** @var string Relationships namespace. */
+    const NS_R = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+
+    /** @var array relationship id => target of the document being read */
+    protected static $rels = [];
+
     /**
      * Convert a docx file into html pages (split at manual page breaks).
      *
@@ -37,11 +46,52 @@ class docx_reader {
      * @return string[]
      */
     public static function to_html_pages(string $path): array {
+        return self::read($path)['pages'];
+    }
+
+    /**
+     * Convert a docx file into one html document with page breaks and embedded images.
+     *
+     * Images are referenced as src="docx:word/media/…" and returned in 'media'.
+     *
+     * @param string $path
+     * @return array ['html' => string, 'media' => [src => ['data' => string, 'filename' => string]]]
+     */
+    public static function to_html(string $path): array {
+        $result = self::read($path);
+        return ['html' => implode("\n<hr class=\"bb-pagebreak\">\n", $result['pages']), 'media' => $result['media']];
+    }
+
+    /**
+     * Read the document.
+     *
+     * @param string $path
+     * @return array ['pages' => string[], 'media' => array]
+     */
+    protected static function read(string $path): array {
         $zip = new \ZipArchive();
         if ($zip->open($path) !== true) {
             throw new \moodle_exception('errorimportformat', 'mod_buchbinder');
         }
         $xml = $zip->getFromName('word/document.xml');
+        self::$rels = [];
+        $media = [];
+        $relsxml = $zip->getFromName('word/_rels/document.xml.rels');
+        if ($relsxml !== false) {
+            $rels = new \DOMDocument();
+            $rels->loadXML($relsxml, LIBXML_NONET);
+            foreach ($rels->getElementsByTagName('Relationship') as $rel) {
+                $target = $rel->getAttribute('Target');
+                if (strpos($target, 'media/') === 0) {
+                    $name = 'word/' . $target;
+                    $data = $zip->getFromName($name);
+                    if ($data !== false) {
+                        self::$rels[$rel->getAttribute('Id')] = 'docx:' . $name;
+                        $media['docx:' . $name] = ['data' => $data, 'filename' => basename($name)];
+                    }
+                }
+            }
+        }
         $zip->close();
         if ($xml === false) {
             throw new \moodle_exception('errorimportformat', 'mod_buchbinder');
@@ -50,9 +100,11 @@ class docx_reader {
         $dom->loadXML($xml, LIBXML_NONET);
         $xpath = new \DOMXPath($dom);
         $xpath->registerNamespace('w', self::NS);
+        $xpath->registerNamespace('a', self::NS_A);
+        $xpath->registerNamespace('r', self::NS_R);
         $body = $xpath->query('/w:document/w:body')->item(0);
         if (!$body) {
-            return [];
+            return ['pages' => [], 'media' => $media];
         }
         $pages = [];
         $html = '';
@@ -105,7 +157,7 @@ class docx_reader {
         if (trim($html) !== '') {
             $pages[] = $html;
         }
-        return $pages;
+        return ['pages' => $pages, 'media' => $media];
     }
 
     /**
@@ -119,6 +171,11 @@ class docx_reader {
         $out = '';
         foreach ($xpath->query('.//w:r', $p) as $run) {
             $text = '';
+            foreach ($xpath->query('.//a:blip/@r:embed', $run) as $embed) {
+                if (isset(self::$rels[$embed->value])) {
+                    $out .= '<img src="' . s(self::$rels[$embed->value]) . '" alt="">';
+                }
+            }
             foreach ($run->childNodes as $child) {
                 if ($child->localName === 't') {
                     $text .= s($child->textContent);

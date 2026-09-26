@@ -44,6 +44,8 @@ class publish_form extends \moodleform {
         $mform->addHelpButton('pagerange', 'pagerange', 'mod_buchbinder');
         $mform->addElement('advcheckbox', 'enablereflow', get_string('enablereflow', 'mod_buchbinder'));
         $mform->addElement('advcheckbox', 'enableprint', get_string('enableprint', 'mod_buchbinder'));
+        $mform->addElement('advcheckbox', 'firstpageright', get_string('firstpageright', 'mod_buchbinder'));
+        $mform->addHelpButton('firstpageright', 'firstpageright', 'mod_buchbinder');
         $mform->addElement('advcheckbox', 'ismaster', get_string('ismaster', 'mod_buchbinder'));
         $mform->addHelpButton('ismaster', 'ismaster', 'mod_buchbinder');
         $this->add_action_buttons(false);

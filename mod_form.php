@@ -55,6 +55,10 @@ class mod_buchbinder_mod_form extends moodleform_mod {
         $mform->addElement('advcheckbox', 'enableprint', get_string('enableprint', 'mod_buchbinder'));
         $mform->setDefault('enableprint', 1);
 
+        $mform->addElement('advcheckbox', 'firstpageright', get_string('firstpageright', 'mod_buchbinder'));
+        $mform->setDefault('firstpageright', 1);
+        $mform->addHelpButton('firstpageright', 'firstpageright', 'mod_buchbinder');
+
         $mform->addElement('advcheckbox', 'ismaster', get_string('ismaster', 'mod_buchbinder'));
         $mform->addHelpButton('ismaster', 'ismaster', 'mod_buchbinder');
 

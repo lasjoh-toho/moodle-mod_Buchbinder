@@ -28,6 +28,7 @@ use stdClass;
  *  - page:        raster image of an image page, itemid = page id
  *  - pagecontent: embedded files of an html page, itemid = page id
  *  - audio:       audio of an audio overlay, itemid = overlay id
+ *  - frameimage:  image of an image frame, itemid = overlay id
  *  - clips:       regions cut out of image pages for composed pages, itemid = 0
  *  - jobfile:     uploads waiting for a background import, itemid = job id
  *  - pagemasked:  cached learner copy of a page image with burned in masks, itemid = page id
@@ -703,6 +704,217 @@ class document {
         );
     }
 
+    // Booklet: positions, sides, blank pages.
+
+    /**
+     * Whether page 1 is a right page (printed book convention).
+     *
+     * @return bool
+     */
+    public function first_page_right(): bool {
+        return !isset($this->instance->firstpageright) || (bool)$this->instance->firstpageright;
+    }
+
+    /**
+     * Positions (1-based) of all pages.
+     *
+     * @return int[] pageid => position
+     */
+    public function get_positions(): array {
+        $positions = [];
+        $i = 1;
+        foreach ($this->get_pages() as $page) {
+            $positions[$page->id] = $i++;
+        }
+        return $positions;
+    }
+
+    /**
+     * Side of the page at a position.
+     *
+     * @param int $position
+     * @return string booklet::LEFT or booklet::RIGHT
+     */
+    public function side_at(int $position): string {
+        return booklet::side($position, $this->first_page_right());
+    }
+
+    /**
+     * Add an empty canvas page (white page for frames).
+     *
+     * @param int|null $afterpageid insert after this page, null: append
+     * @param array $fields additional page fields
+     * @return stdClass
+     */
+    public function add_canvas_page(?int $afterpageid = null, array $fields = []): stdClass {
+        return $this->insert_page(array_merge(['pagetype' => 'canvas', 'width' => booklet::CANVAS_WIDTH,
+            'height' => booklet::CANVAS_HEIGHT], $fields), $afterpageid);
+    }
+
+    /**
+     * Insert a blank page before or after a page.
+     *
+     * @param int $pageid
+     * @param bool $before
+     * @return stdClass new page
+     */
+    public function insert_blank_page(int $pageid, bool $before = false): stdClass {
+        $pages = array_values($this->get_pages());
+        $index = array_search($pageid, array_map(fn($p) => (int)$p->id, $pages));
+        if ($index === false) {
+            throw new \invalid_parameter_exception('Unknown page');
+        }
+        if (!$before) {
+            return $this->add_canvas_page($pageid);
+        }
+        if ($index === 0) {
+            // Insert at the very beginning.
+            global $DB;
+            $DB->execute(
+                'UPDATE {buchbinder_page} SET sortorder = sortorder + 1 WHERE buchbinderid = ?',
+                [$this->instance->id]
+            );
+            $page = $this->insert_page(['pagetype' => 'canvas', 'width' => booklet::CANVAS_WIDTH,
+                'height' => booklet::CANVAS_HEIGHT, 'sortorder' => 0]);
+            $DB->set_field('buchbinder_page', 'sortorder', $pages[0]->sortorder, ['id' => $page->id]);
+            return $page;
+        }
+        return $this->add_canvas_page((int)$pages[$index - 1]->id);
+    }
+
+    /**
+     * Double pages whose halves do not lie on a left and a right page.
+     *
+     * @return array[] ['spreadid' => int, 'leftpageid' => int, 'position' => int]
+     */
+    public function layout_issues(): array {
+        $issues = [];
+        $pages = array_values($this->get_pages());
+        foreach ($pages as $i => $page) {
+            if (!$page->spreadid || $page->spreadside !== 'left') {
+                continue;
+            }
+            $position = $i + 1;
+            $next = $pages[$i + 1] ?? null;
+            $paired = $next && $next->spreadid == $page->spreadid;
+            if ($this->side_at($position) !== booklet::LEFT || !$paired) {
+                $issues[] = ['spreadid' => (int)$page->spreadid, 'leftpageid' => (int)$page->id, 'position' => $position];
+            }
+        }
+        return $issues;
+    }
+
+    /**
+     * Fix a misaligned double page by inserting a blank page before its left half.
+     *
+     * @param int $leftpageid
+     * @return bool whether a page was inserted
+     */
+    public function align_spread(int $leftpageid): bool {
+        $positions = $this->get_positions();
+        if (!isset($positions[$leftpageid]) || $this->side_at($positions[$leftpageid]) === booklet::LEFT) {
+            return false;
+        }
+        $this->insert_blank_page($leftpageid, true);
+        return true;
+    }
+
+    /**
+     * Make sure the next appended page will be on the given side, adding a blank page if needed.
+     *
+     * @param string $side
+     * @return bool whether a blank page was added
+     */
+    public function pad_to_side(string $side): bool {
+        $count = count($this->get_pages());
+        if ($this->side_at($count + 1) === $side) {
+            return false;
+        }
+        $this->add_canvas_page();
+        return true;
+    }
+
+    // Frames.
+
+    /**
+     * Store the image of an image frame.
+     *
+     * @param int $overlayid
+     * @param string $filename
+     * @param string $content
+     * @return stdClass overlay
+     */
+    public function save_frame_image(int $overlayid, string $filename, string $content): stdClass {
+        global $DB;
+        $overlay = $this->get_overlay($overlayid);
+        if ($overlay->overlaytype !== overlay_types::IMAGEFRAME) {
+            throw new \invalid_parameter_exception('Not an image frame');
+        }
+        $maxbytes = self::max_bytes($this->context);
+        if ($maxbytes > 0 && strlen($content) > $maxbytes) {
+            throw new \moodle_exception('errorfiletoolarge', 'mod_buchbinder', '', display_size($maxbytes));
+        }
+        $info = @getimagesizefromstring($content);
+        if (!$info || !in_array($info[2], [IMAGETYPE_PNG, IMAGETYPE_JPEG, IMAGETYPE_GIF, IMAGETYPE_WEBP])) {
+            throw new \moodle_exception('errorimage', 'mod_buchbinder');
+        }
+        $filename = pathinfo(clean_filename($filename) ?: 'image', PATHINFO_FILENAME) . image_type_to_extension($info[2]);
+        $fs = get_file_storage();
+        $fs->delete_area_files($this->context->id, 'mod_buchbinder', 'frameimage', $overlay->id);
+        $fs->create_file_from_string([
+            'contextid' => $this->context->id,
+            'component' => 'mod_buchbinder',
+            'filearea' => 'frameimage',
+            'itemid' => $overlay->id,
+            'filepath' => '/',
+            'filename' => $filename,
+        ], $content);
+        $overlay->settings['filename'] = $filename;
+        $DB->update_record('buchbinder_overlay', (object)['id' => $overlay->id, 'data' => json_encode($overlay->settings),
+            'timemodified' => time()]);
+        return $overlay;
+    }
+
+    /**
+     * URL of the image of an image frame.
+     *
+     * @param stdClass $overlay
+     * @return moodle_url|null
+     */
+    public function frame_image_url(stdClass $overlay): ?moodle_url {
+        if (empty($overlay->settings['filename'])) {
+            return null;
+        }
+        return moodle_url::make_pluginfile_url(
+            $this->context->id,
+            'mod_buchbinder',
+            'frameimage',
+            $overlay->id,
+            '/',
+            $overlay->settings['filename']
+        );
+    }
+
+    /**
+     * Stored file of an image frame.
+     *
+     * @param stdClass $overlay
+     * @return \stored_file|null
+     */
+    public function frame_image_file(stdClass $overlay): ?\stored_file {
+        if (empty($overlay->settings['filename'])) {
+            return null;
+        }
+        return get_file_storage()->get_file(
+            $this->context->id,
+            'mod_buchbinder',
+            'frameimage',
+            $overlay->id,
+            '/',
+            $overlay->settings['filename']
+        ) ?: null;
+    }
+
     // Overlays.
 
     /**
@@ -758,11 +970,13 @@ class document {
         $h = min($h, 1 - $y);
         if ($overlayid) {
             $overlay = $this->get_overlay($overlayid);
-            if ($overlay->pageid != $page->id || $overlay->overlaytype !== $type) {
-                throw new \invalid_parameter_exception('Overlay does not match page or type');
+            if ($overlay->overlaytype !== $type) {
+                throw new \invalid_parameter_exception('Overlay does not match type');
             }
-            if ($type === overlay_types::AUDIO) {
-                // The file name is set by save_audio only.
+            // Frames may be moved to another page of the document (e.g. across a double page).
+            $overlay->pageid = $page->id;
+            if (in_array($type, [overlay_types::AUDIO, overlay_types::IMAGEFRAME])) {
+                // The file name is set by save_audio() / save_frame_image() only.
                 $settings['filename'] = $overlay->settings['filename'] ?? '';
             }
         } else {
@@ -856,7 +1070,10 @@ class document {
     public function delete_overlay(int $overlayid): void {
         global $DB;
         $overlay = $this->get_overlay($overlayid);
-        get_file_storage()->delete_area_files($this->context->id, 'mod_buchbinder', 'audio', $overlay->id);
+        $fs = get_file_storage();
+        foreach (['audio', 'frameimage'] as $area) {
+            $fs->delete_area_files($this->context->id, 'mod_buchbinder', $area, $overlay->id);
+        }
         $DB->delete_records('buchbinder_overlay', ['id' => $overlay->id]);
     }
 
@@ -870,6 +1087,7 @@ class document {
         $fs = get_file_storage();
         foreach ($DB->get_fieldset_select('buchbinder_overlay', 'id', 'pageid = ?', [$pageid]) as $id) {
             $fs->delete_area_files($this->context->id, 'mod_buchbinder', 'audio', $id);
+            $fs->delete_area_files($this->context->id, 'mod_buchbinder', 'frameimage', $id);
         }
         $DB->delete_records('buchbinder_overlay', ['pageid' => $pageid]);
     }
@@ -928,6 +1146,42 @@ class document {
             }
         }
         $DB->update_record('buchbinder_source', $source);
+    }
+
+    /**
+     * Delete a source, optionally with all pages imported from it.
+     *
+     * @param int $sourceid
+     * @param bool $deletepages
+     * @return int number of deleted pages
+     */
+    public function delete_source(int $sourceid, bool $deletepages): int {
+        global $DB;
+        $source = $DB->get_record(
+            'buchbinder_source',
+            ['id' => $sourceid, 'buchbinderid' => $this->instance->id],
+            '*',
+            MUST_EXIST
+        );
+        $count = 0;
+        foreach (
+            $DB->get_fieldset_select(
+                'buchbinder_page',
+                'id',
+                'buchbinderid = ? AND sourceid = ?',
+                [$this->instance->id, $source->id]
+            ) as $pageid
+        ) {
+            if ($deletepages) {
+                $this->delete_page((int)$pageid);
+                $count++;
+            } else {
+                $DB->set_field('buchbinder_page', 'sourceid', null, ['id' => $pageid]);
+            }
+        }
+        get_file_storage()->delete_area_files($this->context->id, 'mod_buchbinder', 'source', $source->id);
+        $DB->delete_records('buchbinder_source', ['id' => $source->id]);
+        return $count;
     }
 
     /**
@@ -1014,7 +1268,11 @@ class document {
                 unset($overlay->id, $overlay->settings);
                 $overlay->pageid = $new->id;
                 $newid = $DB->insert_record('buchbinder_overlay', $overlay);
-                foreach ($fs->get_area_files($master->get_context()->id, 'mod_buchbinder', 'audio', $oldid, 'id', false) as $f) {
+                $files = array_merge(
+                    $fs->get_area_files($master->get_context()->id, 'mod_buchbinder', 'audio', $oldid, 'id', false),
+                    $fs->get_area_files($master->get_context()->id, 'mod_buchbinder', 'frameimage', $oldid, 'id', false)
+                );
+                foreach ($files as $f) {
                     $fs->create_file_from_storedfile(['contextid' => $this->context->id, 'itemid' => $newid], $f);
                 }
             }

@@ -110,6 +110,7 @@ class restore_buchbinder_activity_structure_step extends restore_activity_struct
         $this->add_related_files('mod_buchbinder', 'page', 'buchbinder_page');
         $this->add_related_files('mod_buchbinder', 'pagecontent', 'buchbinder_page');
         $this->add_related_files('mod_buchbinder', 'audio', 'buchbinder_overlay');
+        $this->add_related_files('mod_buchbinder', 'frameimage', 'buchbinder_overlay');
 
         $instanceid = $this->task->get_activityid();
         $pages = $DB->get_records_select('buchbinder_page', 'buchbinderid = ? AND spreadid IS NOT NULL', [$instanceid]);

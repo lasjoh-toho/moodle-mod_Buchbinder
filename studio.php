@@ -46,6 +46,10 @@ if (!in_array($tab, $tabs)) {
     $tab = 'import';
 }
 $baseurl = new moodle_url('/mod/buchbinder/studio.php', ['id' => $cm->id]);
+if ($tab === 'canvas') {
+    // The canvas is the full screen layout desk.
+    redirect(new moodle_url('/mod/buchbinder/desk.php', ['id' => $cm->id, 'pageid' => $pageid]));
+}
 $taburl = new moodle_url($baseurl, ['tab' => $tab]);
 
 $PAGE->set_url($taburl);
@@ -139,7 +143,7 @@ switch ($tab) {
                     'title' => $result['title'], 'url' => $result['url'], 'author' => $data->author ?? '',
                 ]);
                 redirect(
-                    new moodle_url('/mod/buchbinder/snippet.php', ['id' => $cm->id, 'pageid' => $page->id]),
+                    new moodle_url('/mod/buchbinder/desk.php', ['id' => $cm->id, 'pageid' => $page->id]),
                     get_string('snippetharvested', 'mod_buchbinder')
                 );
             } catch (moodle_exception $e) {
@@ -151,7 +155,7 @@ switch ($tab) {
             $fs = get_file_storage();
             $usercontext = context_user::instance($USER->id);
             $ops = array_keys(array_filter(['chop' => $data->chop, 'deskew' => $data->deskew, 'shadow' => $data->shadow,
-                'split' => $data->split]));
+                'split' => $data->split, 'startright' => $data->startright]));
             $files = $fs->get_area_files($usercontext->id, 'user', 'draft', $draftid, 'sortorder, filename', false);
             $job = import_queue::enqueue($document, array_values($files), $ops, ['title' => $data->title,
                 'author' => $data->author, 'url' => $data->url ?: null]);
@@ -231,7 +235,8 @@ switch ($tab) {
                     'link' => $act('linkspread'),
                     'unlink' => $act('unlinkspread'),
                     'delete' => $act('delete'),
-                    'canvas' => (new moodle_url($baseurl, ['tab' => 'canvas', 'pageid' => $page->id]))->out(false),
+                    'canvas' => (new moodle_url('/mod/buchbinder/desk.php', ['id' => $cm->id, 'pageid' => $page->id]))
+                        ->out(false),
                     'edit' => (new moodle_url($page->pagetype === 'layout' ? '/mod/buchbinder/layout.php' :
                         '/mod/buchbinder/snippet.php', ['id' => $cm->id, 'pageid' => $page->id]))->out(false),
                 ],
@@ -260,68 +265,22 @@ switch ($tab) {
                 'citation' => document::citation($source),
                 'showcitation' => document::has_citation($source),
                 'editurl' => (new moodle_url('/mod/buchbinder/source.php', ['cmid' => $cm->id, 'id' => $source->id]))->out(false),
+                'deleteurl' => (new moodle_url('/mod/buchbinder/source.php', ['cmid' => $cm->id, 'id' => $source->id,
+                    'delete' => 'ask']))->out(false),
+                'pages' => $DB->count_records('buchbinder_page', ['buchbinderid' => $instance->id, 'sourceid' => $source->id]),
             ];
         }
         $content .= $OUTPUT->render_from_template('mod_buchbinder/studio_sources', ['sources' => $rows,
             'hassources' => !empty($rows)]);
         break;
 
-    case 'canvas':
-        $pages = array_values($document->get_pages());
-        if (!$pages) {
-            $content .= $OUTPUT->notification(get_string('nopages', 'mod_buchbinder'), 'info');
-            break;
-        }
-        $current = $pages[0];
-        foreach ($pages as $p) {
-            if ($p->id == $pageid) {
-                $current = $p;
-            }
-        }
-        $overlays = [];
-        foreach ($document->get_overlays([$current->id])[$current->id] as $o) {
-            $audio = $document->audio_url($o);
-            $overlays[] = ['id' => (int)$o->id, 'type' => $o->overlaytype, 'x' => (float)$o->x, 'y' => (float)$o->y,
-                'w' => (float)$o->w, 'h' => (float)$o->h, 'settings' => $o->settings,
-                'audiourl' => $audio ? $audio->out(false) : ''];
-        }
-        $glossaries = [];
-        foreach (get_all_instances_in_course('glossary', $course) as $g) {
-            $glossaries[] = ['id' => (int)$g->id, 'name' => format_string($g->name)];
-        }
-        $nav = [];
-        foreach ($pages as $i => $p) {
-            $nav[] = [
-                'number' => $i + 1,
-                'current' => $p->id == $current->id,
-                'url' => (new moodle_url($baseurl, ['tab' => 'canvas', 'pageid' => $p->id]))->out(false),
-                'thumb' => $p->pagetype === 'image' ? $document->page_image_url($p)->out(false) : null,
-            ];
-        }
-        $config = [
-            'cmid' => $cm->id,
-            'pageid' => (int)$current->id,
-            'overlays' => $overlays,
-            'glossaries' => $glossaries,
-            'maxbytes' => $maxbytes,
-        ];
-        $content .= $OUTPUT->render_from_template('mod_buchbinder/editor', [
-            'nav' => $nav,
-            'isimage' => $current->pagetype === 'image',
-            'imageurl' => $current->pagetype === 'image' ? $document->page_image_url($current)->out(false) : '',
-            'html' => $current->pagetype !== 'image' ? $document->page_html($current) : '',
-            'ratio' => $current->height ? round($current->height / max(1, $current->width) * 100, 4) : 141.4286,
-            'config' => json_encode($config),
-            'hasglossaries' => !empty($glossaries),
-        ]);
-        $PAGE->requires->js_call_amd('mod_buchbinder/editor', 'init', ['#buchbinder-editor']);
-        break;
-
     case 'publish':
         $publishform = new \mod_buchbinder\form\publish_form();
         if ($data = $publishform->get_data()) {
             $DB->update_record('buchbinder', (object)['id' => $instance->id, 'pagerange' => trim($data->pagerange),
-                'enablereflow' => $data->enablereflow, 'enableprint' => $data->enableprint, 'ismaster' => $data->ismaster,
+                'enablereflow' => $data->enablereflow, 'enableprint' => $data->enableprint,
+                'firstpageright' => $data->firstpageright,
+                'ismaster' => $data->ismaster,
                 'timemodified' => time()]);
             redirect($taburl, get_string('changessaved'));
         }
@@ -363,7 +322,7 @@ $tabrow = [];
 foreach ($tabs as $i => $t) {
     $tabrow[] = new tabobject(
         $t,
-        new moodle_url($baseurl, ['tab' => $t]),
+        $t === 'canvas' ? new moodle_url('/mod/buchbinder/desk.php', ['id' => $cm->id]) : new moodle_url($baseurl, ['tab' => $t]),
         ($i + 1) . '. ' . get_string('tab_' . $t, 'mod_buchbinder')
     );
 }

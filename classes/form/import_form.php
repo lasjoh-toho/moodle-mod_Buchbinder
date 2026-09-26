@@ -51,6 +51,9 @@ class import_form extends \moodleform {
         $mform->addHelpButton('files', 'importfiles', 'mod_buchbinder');
         $mform->addRule('files', null, 'required');
 
+        $mform->addElement('advcheckbox', 'startright', get_string('startright', 'mod_buchbinder'));
+        $mform->setDefault('startright', 1);
+        $mform->addHelpButton('startright', 'startright', 'mod_buchbinder');
         $mform->addElement('advcheckbox', 'chop', get_string('cleanup_chop', 'mod_buchbinder'));
         $mform->setDefault('chop', 1);
         $mform->addElement('advcheckbox', 'deskew', get_string('cleanup_deskew', 'mod_buchbinder'));

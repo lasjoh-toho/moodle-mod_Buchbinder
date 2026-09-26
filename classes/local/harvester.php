@@ -69,6 +69,20 @@ class harvester {
     }
 
     /**
+     * Fetch a single resource (e.g. an image referenced by imported html).
+     *
+     * @param string $url
+     * @param int $maxbytes
+     * @return string content
+     */
+    public static function fetch(string $url, int $maxbytes): string {
+        if (!self::is_enabled() || !preg_match('#^https?://#i', $url)) {
+            throw new \moodle_exception('harvesterdisabled', 'mod_buchbinder');
+        }
+        return self::get($url, $maxbytes)[0];
+    }
+
+    /**
      * Resolve a relative URL.
      *
      * @param string $base

@@ -67,4 +67,11 @@ $functions = [
         'ajax' => true,
         'capabilities' => 'mod/buchbinder:edit',
     ],
+    'mod_buchbinder_save_frame_image' => [
+        'classname' => \mod_buchbinder\external\save_frame_image::class,
+        'description' => 'Store the image of an image frame.',
+        'type' => 'write',
+        'ajax' => true,
+        'capabilities' => 'mod/buchbinder:edit',
+    ],
 ];

@@ -153,8 +153,11 @@ class eco_print {
         $bx = $sx + self::MARGIN + ($aw - $bw) / 2;
         $by = $sy + self::MARGIN + ($ah - $bh) / 2;
 
-        if ($page->pagetype !== 'image') {
+        if ($page->pagetype === 'html' || $page->pagetype === 'layout') {
             $this->render_html($page, $bx, $by, $bw, $bh);
+        } else if ($page->pagetype === 'canvas') {
+            // White page: content comes from the frames below.
+            $this->pdf->Rect($bx, $by, $bw, $bh, 'D', ['all' => ['width' => 0.1, 'color' => [220, 220, 220]]]);
         } else {
             $img = $this->document->load_page_image($page);
             if ($img) {
@@ -167,7 +170,21 @@ class eco_print {
             }
         }
 
+        // Frames are the content layer, interactive layers lie on top.
+        usort($overlays, fn($a, $b) => (int)!overlay_types::is_frame($a->overlaytype) <=>
+            (int)!overlay_types::is_frame($b->overlaytype));
         foreach ($overlays as $overlay) {
+            if (overlay_types::is_frame($overlay->overlaytype)) {
+                $this->render_frame(
+                    $overlay,
+                    $bx + $overlay->x * $bw,
+                    $by + $overlay->y * $bh,
+                    $overlay->w * $bw,
+                    $overlay->h * $bh,
+                    $bw
+                );
+                continue;
+            }
             $ox = $bx + $overlay->x * $bw;
             $oy = $by + $overlay->y * $bh;
             $ow = $overlay->w * $bw;
@@ -212,6 +229,72 @@ class eco_print {
                 true
             );
         }
+    }
+
+    /**
+     * Render a text or image frame.
+     *
+     * @param \stdClass $frame
+     * @param float $x
+     * @param float $y
+     * @param float $w
+     * @param float $h
+     * @param float $pagewidth width of the page in mm (for font scaling)
+     */
+    protected function render_frame(\stdClass $frame, float $x, float $y, float $w, float $h, float $pagewidth): void {
+        $s = $frame->settings;
+        if ($frame->overlaytype === overlay_types::TEXTFRAME) {
+            if (!empty($s['bgcolor']) && !$this->inksaver) {
+                $this->pdf->Rect($x, $y, $w, $h, 'F', [], self::rgb($s['bgcolor']));
+            }
+            if (!empty($s['border'])) {
+                $this->pdf->Rect($x, $y, $w, $h, 'D', ['all' => ['width' => 0.3, 'color' => [60, 60, 60]]]);
+            }
+            $this->pdf->SetTextColor(0, 0, 0);
+            // 11 pt body text on a 210 mm page, scaled to the printed page size.
+            $this->pdf->SetFont('freesans', '', max(4, 11 * $pagewidth / booklet::PAGE_WIDTH_MM * ($s['fontscale'] ?? 1)));
+            $this->pdf->setHtmlVSpace(['p' => [['h' => 0, 'n' => 0], ['h' => 1, 'n' => 0.4]]]);
+            $html = format_text($s['html'] ?? '', FORMAT_HTML, ['context' => $this->document->get_context(), 'filter' => false]);
+            // TCPDF ignores the CSS of the viewer: give tables visible cell borders.
+            $html = preg_replace('/<table\b/i', '<table border="1" cellpadding="3"', $html);
+            $this->pdf->writeHTMLCell($w, $h, $x, $y, $html, 0, 0, false, true, '', true);
+            return;
+        }
+        $file = $this->document->frame_image_file($frame);
+        if (!$file) {
+            return;
+        }
+        $img = @imagecreatefromstring($file->get_content());
+        if (!$img) {
+            return;
+        }
+        if ($this->inksaver) {
+            $img = image_cleanup::ink_saver($img);
+        }
+        $iw = imagesx($img);
+        $ih = imagesy($img);
+        $boxratio = $w / max(0.001, $h);
+        if (($s['fit'] ?? 'contain') === 'cover') {
+            // Crop the image to the frame.
+            if ($iw / $ih > $boxratio) {
+                $cw = (int)round($ih * $boxratio);
+                $img = imagecrop($img, ['x' => (int)(($iw - $cw) / 2), 'y' => 0, 'width' => $cw, 'height' => $ih]) ?: $img;
+            } else {
+                $ch = (int)round($iw / $boxratio);
+                $img = imagecrop($img, ['x' => 0, 'y' => (int)(($ih - $ch) / 2), 'width' => $iw, 'height' => $ch]) ?: $img;
+            }
+            $dw = $w;
+            $dh = $h;
+        } else if ($iw / $ih > $boxratio) {
+            $dw = $w;
+            $dh = $w * $ih / $iw;
+        } else {
+            $dh = $h;
+            $dw = $h * $iw / $ih;
+        }
+        imagealphablending($img, false);
+        imagesavealpha($img, true);
+        $this->pdf->Image('@' . image_cleanup::to_png($img), $x + ($w - $dw) / 2, $y + ($h - $dh) / 2, $dw, $dh, 'PNG');
     }
 
     /**

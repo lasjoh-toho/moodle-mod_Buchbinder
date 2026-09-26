@@ -22,9 +22,10 @@
     Example context (json):
     {
         "cmid": 3, "haspages": true, "reflow": true, "printurl": "#", "studiourl": "#",
-        "pages": [{"id": 1, "number": 1, "isimage": true, "imageurl": "#", "ratio": 141.4, "citation": "",
-                   "hasreflow": true, "reflow": [{"text": "Hello", "isp": true}],
-                   "overlays": [{"id": 5, "style": "left:10%;top:10%;width:20%;height:5%;", "ismask": true, "revealable": true}]}]
+        "spreads": [{"double": false, "single": "right",
+            "pages": [{"id": 1, "number": 1, "side": "right", "isimage": true, "fixed": true, "imageurl": "#", "ratio": 141.4,
+                   "citation": "", "hasreflow": true, "reflow": [{"text": "Hello", "isp": true}],
+                   "overlays": [{"id": 5, "style": "left:10%;top:10%;width:20%;height:5%;", "ismask": true, "revealable": true}]}]}]
     }
 }}
 <div class="mod-buchbinder-viewer" id="buchbinder-viewer-{{cmid}}" data-cmid="{{cmid}}">
@@ -41,18 +42,20 @@
         <a class="btn btn-secondary mr-2 me-2 mb-2" href="{{printurl}}">{{#str}}ecoprint, mod_buchbinder{{/str}}</a>
         {{/printurl}}
         {{#studiourl}}
-        <a class="btn btn-primary mb-2" href="{{studiourl}}">{{#str}}studio, mod_buchbinder{{/str}}</a>
+        <a class="btn btn-primary mb-2" href="{{studiourl}}">{{#str}}desk, mod_buchbinder{{/str}}</a>
         {{/studiourl}}
     </div>
     {{^haspages}}
         <div class="alert alert-info">{{#str}}nopages, mod_buchbinder{{/str}}</div>
     {{/haspages}}
     <div class="bb-pages">
+    {{#spreads}}
+    <div class="bb-spread{{#double}} bb-spread-double{{/double}}{{#single}} bb-spread-single bb-spread-single-{{single}}{{/single}}">
     {{#pages}}
-        <section class="bb-page{{#landscape}} bb-landscape{{/landscape}}{{#spreadside}} bb-spread-{{spreadside}}{{/spreadside}}"
+        <section class="bb-page{{#landscape}} bb-landscape{{/landscape}}{{#side}} bb-side-{{side}}{{/side}}{{#iscanvas}} bb-canvas{{/iscanvas}}"
                  data-pageid="{{id}}" aria-label="{{#str}}pagex, mod_buchbinder, {{number}}{{/str}}">
             <div class="bb-zoomwrap">
-                <div class="bb-sheet{{^isimage}} bb-sheet-html{{/isimage}}"{{#isimage}} style="aspect-ratio: 100 / {{ratio}};"{{/isimage}}>
+                <div class="bb-sheet{{^fixed}} bb-sheet-html{{/fixed}}"{{#fixed}} style="aspect-ratio: 100 / {{ratio}};"{{/fixed}}>
                     {{#isimage}}
                         <img class="bb-image" src="{{imageurl}}" alt="{{#str}}pagex, mod_buchbinder, {{number}}{{/str}}" loading="lazy">
                     {{/isimage}}
@@ -60,6 +63,14 @@
                         <div class="bb-html">{{{html}}}</div>
                     {{/isimage}}
                     {{#overlays}}
+                        {{#istextframe}}
+                            <div class="bb-overlay bb-frame bb-textframe{{#border}} bb-frame-border{{/border}}" style="{{style}}{{framestyle}}">{{{html}}}</div>
+                        {{/istextframe}}
+                        {{#isimageframe}}
+                            <div class="bb-overlay bb-frame bb-imageframe" style="{{style}}">
+                                <img src="{{src}}" alt="{{alt}}" loading="lazy"{{#cover}} class="bb-cover"{{/cover}}>
+                            </div>
+                        {{/isimageframe}}
                         {{#ismask}}
                             {{#revealable}}
                             <button type="button" class="bb-overlay bb-mask{{#black}} bb-mask-black{{/black}}{{#teacher}} bb-mask-teacher{{/teacher}}"
@@ -94,6 +105,8 @@
             {{#hasreflow}}
             <div class="bb-reflow" hidden>
                 {{#reflow}}
+                    {{#rhtml}}<div class="bb-reflow-html">{{{rhtml}}}</div>{{/rhtml}}
+                    {{#rimage}}<img src="{{rimage}}" alt="{{ralt}}" class="img-fluid d-block mx-auto mb-3">{{/rimage}}
                     {{#ish2}}<h3>{{text}}</h3>{{/ish2}}
                     {{#ish3}}<h4>{{text}}</h4>{{/ish3}}
                     {{#isli}}<p class="bb-reflow-li">• {{text}}</p>{{/isli}}
@@ -107,5 +120,7 @@
             <div class="bb-pagenumber small text-muted">{{number}}</div>
         </section>
     {{/pages}}
+    </div>
+    {{/spreads}}
     </div>
 </div>

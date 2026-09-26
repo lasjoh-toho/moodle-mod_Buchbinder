@@ -5,6 +5,21 @@ neuen Version (siehe README, „Release erstellen“).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-09-26
+
+- Broschüren-Modell: Jede Seite liegt links oder rechts (Seite 1 rechts, dann Doppelseiten 2|3, 4|5 …),
+  gespiegelter Satzspiegel mit Bundsteg; Leseansicht zeigt Doppelseiten nebeneinander
+- Gescannte Doppelseiten landen automatisch auf linker und rechter Seite, dafür werden bei Bedarf
+  Leerseiten eingefügt; falsch liegende Doppelseiten werden markiert und lassen sich per Klick ausrichten
+- Leerseiten können überall eingefügt werden
+- Word, HTML, Markdown (neu), Web-Ausschnitte und Zwischenablage werden als verschiebbare Text- und
+  Bildrahmen gesetzt (Satzlauf mit Seitenumbruch, geteilten Absätzen/Listen/Tabellen, Bildern aus Word)
+- Vollbild-Satzstudio im DTP-Stil: Seitenpalette, Werkzeuge, Montagefläche mit Doppelseite,
+  Hilfslinien mit Einrasten, Rahmen über den Bund ziehen, Text direkt im Rahmen bearbeiten,
+  Übersatz-Anzeige, Zoom
+- Quellen können gelöscht werden, wahlweise mit den importierten Seiten
+- Druck und Smartphone-Textansicht berücksichtigen Text- und Bildrahmen
+
 ## [0.4.0] - 2026-09-26
 
 - Release-Workflow: GitHub Actions prüft jeden Push (Moodle 4.4, 4.5 und 5.0) und veröffentlicht

@@ -9,17 +9,38 @@ anlegen, eine Textansicht für Smartphones anbieten und papiersparend drucken.
 > Komponentenname: `mod_buchbinder`. Moodle verlangt kleingeschriebene Komponentennamen, daher
 > heißt das Verzeichnis `mod/buchbinder`, obwohl das Repository `moodle-mod_Buchbinder` heißt.
 
-Status: **0.3.0 (Alpha)**. Der gesamte Arbeitsablauf ist umgesetzt; Punkte, die noch fehlen,
+Status: **0.5.0 (Alpha)**. Der gesamte Arbeitsablauf ist umgesetzt; Punkte, die noch fehlen,
 stehen unter [Roadmap](#roadmap).
+
+## Broschüre und Satzstudio
+
+Jedes Dokument wird von Anfang an als **Broschüre** gedacht: Seite 1 ist (wie im Buch) eine rechte
+Seite, danach folgen Doppelseiten 2|3, 4|5 … (umstellbar in den Einstellungen). Der Satzspiegel ist
+gespiegelt, der Bundsteg liegt immer an der Bindung.
+
+- **Import als Rahmen:** Word (inkl. Bilder), HTML, Markdown, Web-Ausschnitte und die Zwischenablage
+  werden in Blöcke zerlegt und per Satzlauf als verschiebbare **Text- und Bildrahmen** auf Seiten
+  verteilt. Lange Absätze, Listen und Tabellen werden auf Folgeseiten fortgesetzt, Überschriften
+  bleiben beim folgenden Text, Seitenumbrüche aus Word/Markdown werden übernommen. Dokumente
+  beginnen auf Wunsch auf einer rechten Seite.
+- **Leerseiten:** Gescannte Doppelseiten werden so platziert, dass die linke Hälfte links liegt –
+  wo nötig mit automatisch eingefügter Leerseite. Liegt eine Doppelseite später falsch (z. B. nach
+  dem Löschen einer Seite), wird sie markiert und lässt sich per Klick ausrichten. Leerseiten
+  lassen sich außerdem vor oder nach jeder Seite einfügen.
+- **Satzstudio (`desk.php`):** Vollbild-Arbeitsplatz im Stil von DTP-Programmen mit Seitenpalette
+  (Doppelseiten-Miniaturen), Werkzeugleiste, Montagefläche mit der aktuellen Doppelseite,
+  Satzspiegel-Hilfslinien mit Einrasten und Eigenschaften-Panel. Rahmen lassen sich über den Bund
+  auf die andere Seite ziehen; Doppelklick bearbeitet den Text direkt im Rahmen (fett, kursiv,
+  Überschriften, Listen), ein rotes „+“ zeigt Übersatz an.
 
 ## Arbeitsablauf im Publishing Studio
 
 | Schritt | Reiter | Funktionen |
 |---|---|---|
-| 1a Import | **1. Import** | PDF, Word (.docx), HTML, Bilder (PNG/JPG/GIF/WebP/TIFF), Comic-Archive (.cbz/.zip), leere Arbeitsblätter (Blanko, Liniert, Kariert, Notenlinien), Web-Ausschnitt (Harvester), Einfügen aus der Zwischenablage, Asset Bank |
+| 1a Import | **1. Import** | PDF, Word (.docx), HTML, Markdown (.md), Bilder (PNG/JPG/GIF/WebP/TIFF), Comic-Archive (.cbz/.zip), leere Arbeitsblätter (Blanko, Liniert, Kariert, Notenlinien), Web-Ausschnitt (Harvester), Einfügen aus der Zwischenablage, Asset Bank |
 | 1b Bereinigung | **2. Seiten & Bereinigung** | Ränder beschneiden, entzerren (Schräglage ±5°), Schatten/Vergilbung entfernen, Doppelseiten am Mittelsteg trennen, Querformatschutz, Doppelseiten verknüpfen/lösen, drehen, sortieren |
-| 1c Fundstellen | **3. Quellen** | Herkunft (Titel, Autor/in, URL, Abrufdatum) wird beim Import erfasst und als verlinktes Zitat am Seitenende angezeigt |
-| 2–4 Canvas | **4. Canvas & Overlays** | Ausschnitte für gestaltete Seiten, Überschreiben mit Papierfarb-Abgleich, Abdeckungen, Audio-Trigger, Glossarbegriffe, Textblöcke für die Textansicht, Spaltenbereiche mit automatischer Spaltenerkennung |
+| 1c Fundstellen | **3. Quellen** | Herkunft (Titel, Autor/in, URL, Abrufdatum) wird beim Import erfasst und als verlinktes Zitat am Seitenende angezeigt; Quellen lassen sich löschen (wahlweise mit ihren Seiten) |
+| 2–4 Satzstudio | **4. Satzstudio** (Vollbild) | Text- und Bildrahmen, Leerseiten, Ausschnitte für gestaltete Seiten, Überschreiben mit Papierfarb-Abgleich, Abdeckungen, Audio-Trigger, Glossarbegriffe, Textblöcke für die Textansicht, Spaltenbereiche mit automatischer Spaltenerkennung |
 | 5 Veröffentlichung | **5. Veröffentlichen** | Seitenauszug (z. B. `5-12`), Textansicht und Druck an/aus, Master für die Asset Bank, Verwendungsnachweis |
 
 ## Funktionen im Detail
