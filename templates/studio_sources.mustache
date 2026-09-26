@@ -1,0 +1,49 @@
+{{!
+    This file is part of Moodle - https://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Moodle is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
+}}
+{{!
+    @template mod_buchbinder/studio_sources
+
+    Provenance of imported content.
+
+    Example context (json):
+    {"hassources": true, "sources": [{"type": "Web", "title": "Wikipedia", "citation": "Wikipedia, accessed 1 May", "showcitation": true, "editurl": "#"}]}
+}}
+{{^hassources}}
+    <div class="alert alert-info">{{#str}}nosources, mod_buchbinder{{/str}}</div>
+{{/hassources}}
+{{#hassources}}
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>{{#str}}sourcetype, mod_buchbinder{{/str}}</th>
+            <th>{{#str}}sourcetitle, mod_buchbinder{{/str}}</th>
+            <th>{{#str}}citation, mod_buchbinder{{/str}}</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+    {{#sources}}
+        <tr>
+            <td>{{type}}</td>
+            <td>{{title}}</td>
+            <td>{{#showcitation}}{{{citation}}}{{/showcitation}}{{^showcitation}}<span class="text-muted">{{#str}}nocitation, mod_buchbinder{{/str}}</span>{{/showcitation}}</td>
+            <td><a class="btn btn-sm btn-secondary" href="{{editurl}}">{{#str}}edit{{/str}}</a></td>
+        </tr>
+    {{/sources}}
+    </tbody>
+</table>
+{{/hassources}}

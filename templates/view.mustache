@@ -1,0 +1,111 @@
+{{!
+    This file is part of Moodle - https://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Moodle is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
+}}
+{{!
+    @template mod_buchbinder/view
+
+    Reader view: pages with interactive layers, text view (reflow) and column zoom.
+
+    Example context (json):
+    {
+        "cmid": 3, "haspages": true, "reflow": true, "printurl": "#", "studiourl": "#",
+        "pages": [{"id": 1, "number": 1, "isimage": true, "imageurl": "#", "ratio": 141.4, "citation": "",
+                   "hasreflow": true, "reflow": [{"text": "Hello", "isp": true}],
+                   "overlays": [{"id": 5, "style": "left:10%;top:10%;width:20%;height:5%;", "ismask": true, "revealable": true}]}]
+    }
+}}
+<div class="mod-buchbinder-viewer" id="buchbinder-viewer-{{cmid}}" data-cmid="{{cmid}}">
+    <div class="bb-toolbar d-flex flex-wrap mb-3" role="toolbar" aria-label="{{#str}}toolbar, mod_buchbinder{{/str}}">
+        {{#reflow}}
+        <button type="button" class="btn btn-secondary mr-2 me-2 mb-2" data-action="toggle-reflow" aria-pressed="false">
+            {{#str}}textview, mod_buchbinder{{/str}}
+        </button>
+        {{/reflow}}
+        <button type="button" class="btn btn-secondary mr-2 me-2 mb-2" data-action="toggle-hotspots" aria-pressed="false">
+            {{#str}}showhotspots, mod_buchbinder{{/str}}
+        </button>
+        {{#printurl}}
+        <a class="btn btn-secondary mr-2 me-2 mb-2" href="{{printurl}}">{{#str}}ecoprint, mod_buchbinder{{/str}}</a>
+        {{/printurl}}
+        {{#studiourl}}
+        <a class="btn btn-primary mb-2" href="{{studiourl}}">{{#str}}studio, mod_buchbinder{{/str}}</a>
+        {{/studiourl}}
+    </div>
+    {{^haspages}}
+        <div class="alert alert-info">{{#str}}nopages, mod_buchbinder{{/str}}</div>
+    {{/haspages}}
+    <div class="bb-pages">
+    {{#pages}}
+        <section class="bb-page{{#landscape}} bb-landscape{{/landscape}}{{#spreadside}} bb-spread-{{spreadside}}{{/spreadside}}"
+                 data-pageid="{{id}}" aria-label="{{#str}}pagex, mod_buchbinder, {{number}}{{/str}}">
+            <div class="bb-zoomwrap">
+                <div class="bb-sheet{{^isimage}} bb-sheet-html{{/isimage}}"{{#isimage}} style="aspect-ratio: 100 / {{ratio}};"{{/isimage}}>
+                    {{#isimage}}
+                        <img class="bb-image" src="{{imageurl}}" alt="{{#str}}pagex, mod_buchbinder, {{number}}{{/str}}" loading="lazy">
+                    {{/isimage}}
+                    {{^isimage}}
+                        <div class="bb-html">{{{html}}}</div>
+                    {{/isimage}}
+                    {{#overlays}}
+                        {{#ismask}}
+                            {{#revealable}}
+                            <button type="button" class="bb-overlay bb-mask{{#black}} bb-mask-black{{/black}}{{#teacher}} bb-mask-teacher{{/teacher}}"
+                                    style="{{style}}" data-action="reveal" aria-pressed="false"
+                                    title="{{#str}}revealsolution, mod_buchbinder{{/str}}">
+                                <span class="bb-mask-label">{{label}}</span>
+                            </button>
+                            {{/revealable}}
+                            {{^revealable}}
+                            <div class="bb-overlay bb-mask{{#black}} bb-mask-black{{/black}}{{#teacher}} bb-mask-teacher{{/teacher}}"
+                                 style="{{style}}" aria-hidden="true"></div>
+                            {{/revealable}}
+                        {{/ismask}}
+                        {{#istextbox}}
+                            <div class="bb-overlay bb-textbox" style="{{style}}{{textstyle}}">{{text}}</div>
+                        {{/istextbox}}
+                        {{#isaudio}}
+                            <button type="button" class="bb-overlay bb-hotspot bb-audio" style="{{style}}" data-action="audio"
+                                    data-src="{{audiourl}}" {{#tts}}data-tts="{{ttstext}}" data-lang="{{ttslang}}"{{/tts}}
+                                    aria-label="{{label}}" title="{{label}}"></button>
+                        {{/isaudio}}
+                        {{#isglossary}}
+                            <button type="button" class="bb-overlay bb-glossary" style="{{style}}" data-action="glossary"
+                                    data-overlayid="{{id}}" aria-label="{{term}}" aria-expanded="false" title="{{term}}"></button>
+                        {{/isglossary}}
+                        {{#iscolumn}}
+                            <div class="bb-overlay bb-column" style="{{style}}" data-action="column" data-column="{{column}}"></div>
+                        {{/iscolumn}}
+                    {{/overlays}}
+                </div>
+            </div>
+            {{#hasreflow}}
+            <div class="bb-reflow" hidden>
+                {{#reflow}}
+                    {{#ish2}}<h3>{{text}}</h3>{{/ish2}}
+                    {{#ish3}}<h4>{{text}}</h4>{{/ish3}}
+                    {{#isli}}<p class="bb-reflow-li">• {{text}}</p>{{/isli}}
+                    {{#isp}}<p>{{text}}</p>{{/isp}}
+                {{/reflow}}
+            </div>
+            {{/hasreflow}}
+            {{#citation}}
+                <footer class="bb-citation small text-muted">{{#str}}source, mod_buchbinder{{/str}}: {{{citation}}}</footer>
+            {{/citation}}
+            <div class="bb-pagenumber small text-muted">{{number}}</div>
+        </section>
+    {{/pages}}
+    </div>
+</div>

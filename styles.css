@@ -1,0 +1,420 @@
+/* Reader. */
+.mod-buchbinder-viewer .bb-pages {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+.mod-buchbinder-viewer .bb-page {
+    position: relative;
+    width: 100%;
+    max-width: 900px;
+}
+
+.mod-buchbinder-viewer .bb-page.bb-landscape {
+    max-width: 1280px;
+}
+
+.path-mod-buchbinder .bb-zoomwrap {
+    overflow: hidden;
+    box-shadow: 0 1px 6px rgba(0, 0, 0, .2);
+    background: #fff;
+}
+
+.path-mod-buchbinder .bb-sheet {
+    position: relative;
+    width: 100%;
+    container-type: inline-size;
+    background: #fff;
+    user-select: none;
+}
+
+.path-mod-buchbinder .bb-sheet-html {
+    min-height: 20rem;
+    user-select: text;
+}
+
+.path-mod-buchbinder .bb-sheet .bb-image {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.path-mod-buchbinder .bb-sheet .bb-html {
+    padding: 6cqw 7cqw;
+    font-size: max(14px, 1.9cqw);
+    color: #000;
+}
+
+.path-mod-buchbinder .bb-sheet .bb-html img {
+    max-width: 100%;
+    height: auto;
+}
+
+.path-mod-buchbinder .bb-overlay {
+    position: absolute;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+}
+
+/* Type-over: font size relative to a page width of 1000 units. */
+.path-mod-buchbinder .bb-textbox {
+    font-size: calc(var(--bb-fs, 16) * .1cqw);
+    line-height: 1.2;
+    white-space: pre-wrap;
+    overflow: hidden;
+    padding: 0 .2cqw;
+    user-select: text;
+}
+
+/* Masks. */
+.mod-buchbinder-viewer .bb-mask {
+    background: #fff;
+    transition: opacity .3s;
+}
+
+.mod-buchbinder-viewer .bb-mask-black {
+    background: #000;
+}
+
+.mod-buchbinder-viewer button.bb-mask {
+    cursor: pointer;
+    outline: 1px dashed #999;
+}
+
+.mod-buchbinder-viewer button.bb-mask .bb-mask-label {
+    color: #666;
+    font-size: max(11px, 1.4cqw);
+}
+
+.mod-buchbinder-viewer .bb-mask.revealed {
+    opacity: 0;
+}
+
+.mod-buchbinder-viewer .bb-mask.bb-mask-teacher {
+    opacity: .35;
+    outline: 2px dashed #c00;
+}
+
+.mod-buchbinder-viewer .bb-mask.bb-mask-teacher.revealed {
+    opacity: .05;
+}
+
+/* Invisible hotspots, visible on focus, hover and on request. */
+.mod-buchbinder-viewer .bb-audio {
+    cursor: pointer;
+}
+
+.mod-buchbinder-viewer .bb-audio:hover,
+.mod-buchbinder-viewer .bb-audio:focus-visible,
+.mod-buchbinder-viewer.bb-show-hotspots .bb-audio {
+    background: rgba(0, 120, 255, .15);
+    outline: 2px solid rgba(0, 120, 255, .6);
+}
+
+.mod-buchbinder-viewer .bb-audio.playing {
+    background: rgba(0, 170, 80, .2);
+    outline: 2px solid rgba(0, 170, 80, .8);
+}
+
+.mod-buchbinder-viewer .bb-glossary {
+    cursor: help;
+    border-bottom: 2px dotted #e6a700;
+    background: rgba(255, 214, 0, .18);
+}
+
+.mod-buchbinder-viewer .bb-glossary:focus-visible,
+.mod-buchbinder-viewer .bb-glossary[aria-expanded="true"] {
+    background: rgba(255, 214, 0, .35);
+}
+
+.mod-buchbinder-viewer .bb-popover {
+    position: absolute;
+    z-index: 10;
+    max-width: min(24rem, 90vw);
+}
+
+.mod-buchbinder-viewer .bb-column {
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* Hotspots always stay above column regions. */
+.mod-buchbinder-viewer .bb-overlay:not(.bb-column) {
+    z-index: 1;
+}
+
+.mod-buchbinder-viewer .bb-citation {
+    padding: .25rem .5rem;
+}
+
+.mod-buchbinder-viewer .bb-pagenumber {
+    text-align: center;
+}
+
+/* Double pages side by side on wide screens. */
+@media (min-width: 1200px) {
+    .mod-buchbinder-viewer .bb-pages {
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    .mod-buchbinder-viewer .bb-page.bb-spread-left,
+    .mod-buchbinder-viewer .bb-page.bb-spread-right {
+        width: calc(50% - .75rem);
+    }
+
+    .mod-buchbinder-viewer .bb-page:not(.bb-spread-left):not(.bb-spread-right) {
+        flex-basis: 100%;
+    }
+
+    .mod-buchbinder-viewer .bb-page:not(.bb-spread-left):not(.bb-spread-right) .bb-zoomwrap {
+        max-width: 900px;
+        margin: 0 auto;
+    }
+
+    .mod-buchbinder-viewer .bb-page.bb-landscape:not(.bb-spread-left):not(.bb-spread-right) .bb-zoomwrap {
+        max-width: 1280px;
+    }
+}
+
+/* Smartphones: column zoom and reflow. */
+@media (max-width: 767.98px) {
+    .mod-buchbinder-viewer.bb-has-columns .bb-column {
+        pointer-events: auto;
+        cursor: zoom-in;
+    }
+
+    .mod-buchbinder-viewer .bb-sheet.bb-zoomed {
+        transition: width .25s, margin-left .25s;
+    }
+
+    .mod-buchbinder-viewer .bb-sheet.bb-zoomed .bb-column {
+        cursor: zoom-out;
+    }
+}
+
+.mod-buchbinder-viewer .bb-reflow {
+    max-width: 40rem;
+    margin: 0 auto;
+    font-size: 1.1rem;
+    line-height: 1.6;
+    padding: 1rem;
+    background: #fff;
+    user-select: text;
+}
+
+.mod-buchbinder-viewer .bb-reflow p {
+    white-space: pre-wrap;
+}
+
+@media print {
+    .mod-buchbinder-viewer .bb-toolbar {
+        display: none !important;
+    }
+
+    .mod-buchbinder-viewer .bb-page {
+        break-inside: avoid;
+    }
+
+    .mod-buchbinder-viewer .bb-mask {
+        opacity: 1 !important;
+    }
+}
+
+/* Studio: page list. */
+.path-mod-buchbinder .bb-studio-pages {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 1rem;
+}
+
+.path-mod-buchbinder .bb-studio-thumb {
+    height: 220px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #eee;
+    overflow: hidden;
+}
+
+.path-mod-buchbinder .bb-studio-thumb img {
+    max-width: 100%;
+    max-height: 100%;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .3);
+}
+
+.path-mod-buchbinder .bb-studio-excerpt {
+    padding: .5rem;
+    background: #fff;
+    height: 100%;
+    overflow: hidden;
+}
+
+.path-mod-buchbinder .bb-studio-spread {
+    border-color: #17a2b8;
+}
+
+.path-mod-buchbinder .bb-studio-actions .btn {
+    margin: 0 .15rem .25rem 0;
+}
+
+/* Studio: canvas editor. */
+.mod-buchbinder-editor {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+}
+
+.mod-buchbinder-editor .bb-editor-nav {
+    flex: 0 0 90px;
+    max-height: 80vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: .5rem;
+}
+
+.mod-buchbinder-editor .bb-editor-navitem {
+    display: block;
+    text-align: center;
+    border: 2px solid transparent;
+    padding: 2px;
+    background: #f5f5f5;
+    min-height: 2rem;
+}
+
+.mod-buchbinder-editor .bb-editor-navitem img {
+    width: 100%;
+    display: block;
+}
+
+.mod-buchbinder-editor .bb-editor-navitem.current {
+    border-color: #0f6cbf;
+}
+
+.mod-buchbinder-editor .bb-editor-main {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.mod-buchbinder-editor .bb-editor-workspace {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+}
+
+.mod-buchbinder-editor .bb-editor-stage {
+    flex: 1 1 auto;
+    max-width: 900px;
+    box-shadow: 0 1px 6px rgba(0, 0, 0, .25);
+    touch-action: none;
+}
+
+.mod-buchbinder-editor .bb-editor-stage.bb-drawing {
+    cursor: crosshair;
+}
+
+.mod-buchbinder-editor .bb-editor-panel {
+    flex: 0 0 300px;
+    position: sticky;
+    top: 4rem;
+}
+
+.mod-buchbinder-editor .bb-edit-overlay {
+    position: absolute;
+    border: 1px dashed #0f6cbf;
+    cursor: move;
+    overflow: hidden;
+    font-size: calc(var(--bb-fs, 12) * .1cqw);
+    line-height: 1.2;
+    white-space: pre-wrap;
+}
+
+.mod-buchbinder-editor .bb-edit-overlay.selected {
+    border: 2px solid #0f6cbf;
+    z-index: 5;
+}
+
+.mod-buchbinder-editor .bb-edit-overlay:focus-visible {
+    outline: 3px solid #ffbf47;
+}
+
+.mod-buchbinder-editor .bb-edit-label {
+    pointer-events: none;
+    display: block;
+}
+
+.mod-buchbinder-editor .bb-type-mask {
+    background: rgba(255, 255, 255, .75);
+    border-color: #c00;
+}
+
+.mod-buchbinder-editor .bb-type-mask.bb-mask-black {
+    background: rgba(0, 0, 0, .7);
+    color: #fff;
+}
+
+.mod-buchbinder-editor .bb-type-audio {
+    background: rgba(0, 120, 255, .15);
+    border-color: #0078ff;
+    font-size: 12px;
+}
+
+.mod-buchbinder-editor .bb-type-glossary {
+    background: rgba(255, 214, 0, .25);
+    border-color: #e6a700;
+    font-size: 12px;
+}
+
+.mod-buchbinder-editor .bb-type-reflow {
+    background: rgba(40, 167, 69, .12);
+    border-color: #28a745;
+    font-size: 11px;
+    color: #155724;
+}
+
+.mod-buchbinder-editor .bb-type-column {
+    background: rgba(111, 66, 193, .08);
+    border-color: #6f42c1;
+    font-size: 11px;
+    color: #6f42c1;
+}
+
+.mod-buchbinder-editor .bb-resize {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: 12px;
+    height: 12px;
+    background: #0f6cbf;
+    cursor: nwse-resize;
+}
+
+@media (max-width: 991.98px) {
+    .mod-buchbinder-editor,
+    .mod-buchbinder-editor .bb-editor-workspace {
+        flex-direction: column;
+    }
+
+    .mod-buchbinder-editor .bb-editor-nav {
+        flex-direction: row;
+        max-height: none;
+        overflow-x: auto;
+        width: 100%;
+    }
+
+    .mod-buchbinder-editor .bb-editor-navitem {
+        flex: 0 0 70px;
+    }
+
+    .mod-buchbinder-editor .bb-editor-panel {
+        position: static;
+        flex-basis: auto;
+        width: 100%;
+    }
+}

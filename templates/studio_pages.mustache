@@ -1,0 +1,89 @@
+{{!
+    This file is part of Moodle - https://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Moodle is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
+}}
+{{!
+    @template mod_buchbinder/studio_pages
+
+    Page list with cleanup and layout protection.
+
+    Example context (json):
+    {
+        "haspages": true, "cleanupallurl": "#", "cmid": 1, "sesskey": "x",
+        "pages": [{"id": 1, "number": 1, "isimage": true, "thumb": "#", "source": "Scan", "isspread": true,
+                   "spreadside": "left", "landscapelock": false, "canlink": false, "size": "1240 × 1754",
+                   "urls": {"moveup": "#", "movedown": "#", "rotate": "#", "chop": "#", "deskew": "#", "shadow": "#",
+                            "split": "#", "lock": "#", "link": "#", "unlink": "#", "delete": "#", "canvas": "#", "edit": "#"}}]
+    }
+}}
+{{^haspages}}
+    <div class="alert alert-info">{{#str}}nopages, mod_buchbinder{{/str}}</div>
+{{/haspages}}
+{{#haspages}}
+<form method="post" action="{{cleanupallurl}}" class="card card-body mb-3">
+    <input type="hidden" name="id" value="{{cmid}}">
+    <input type="hidden" name="sesskey" value="{{sesskey}}">
+    <input type="hidden" name="action" value="cleanupall">
+    <strong class="mb-2">{{#str}}cleanupall, mod_buchbinder{{/str}}</strong>
+    <div class="d-flex flex-wrap align-items-center">
+        <label class="mr-3 me-3"><input type="checkbox" name="ops[]" value="chop" checked> {{#str}}cleanup_chop, mod_buchbinder{{/str}}</label>
+        <label class="mr-3 me-3"><input type="checkbox" name="ops[]" value="deskew"> {{#str}}cleanup_deskew, mod_buchbinder{{/str}}</label>
+        <label class="mr-3 me-3"><input type="checkbox" name="ops[]" value="shadow"> {{#str}}cleanup_shadow, mod_buchbinder{{/str}}</label>
+        <label class="mr-3 me-3"><input type="checkbox" name="ops[]" value="split"> {{#str}}cleanup_split, mod_buchbinder{{/str}}</label>
+        <button type="submit" class="btn btn-secondary">{{#str}}apply, mod_buchbinder{{/str}}</button>
+    </div>
+    <div class="small text-muted mt-2">{{#str}}cleanupwarning, mod_buchbinder{{/str}}</div>
+</form>
+<div class="bb-studio-pages">
+{{#pages}}
+    <div class="card bb-studio-page{{#isspread}} bb-studio-spread{{/isspread}}">
+        <div class="bb-studio-thumb">
+            {{#isimage}}<img src="{{thumb}}" alt="" loading="lazy">{{/isimage}}
+            {{^isimage}}<div class="bb-studio-excerpt small">{{excerpt}}</div>{{/isimage}}
+        </div>
+        <div class="card-body p-2">
+            <div class="d-flex justify-content-between">
+                <strong>{{#str}}pagex, mod_buchbinder, {{number}}{{/str}}</strong>
+                <span class="small text-muted">{{size}}</span>
+            </div>
+            <div class="small text-muted text-truncate" title="{{source}}">{{source}}</div>
+            <div class="mb-1">
+                {{#isspread}}<span class="badge badge-info bg-info">{{spreadside}}</span>{{/isspread}}
+                {{#landscapelock}}<span class="badge badge-warning bg-warning text-dark">{{#str}}landscapeprotected, mod_buchbinder{{/str}}</span>{{/landscapelock}}
+            </div>
+            <div class="bb-studio-actions">
+                <a class="btn btn-sm btn-light" href="{{urls.moveup}}" title="{{#str}}moveup{{/str}}">▲</a>
+                <a class="btn btn-sm btn-light" href="{{urls.movedown}}" title="{{#str}}movedown{{/str}}">▼</a>
+                <a class="btn btn-sm btn-primary" href="{{urls.canvas}}">{{#str}}tab_canvas, mod_buchbinder{{/str}}</a>
+                {{^isimage}}<a class="btn btn-sm btn-light" href="{{urls.edit}}">{{#str}}edit{{/str}}</a>{{/isimage}}
+                {{#isimage}}
+                <a class="btn btn-sm btn-light" href="{{urls.rotate}}" title="{{#str}}rotate, mod_buchbinder{{/str}}">↻</a>
+                <a class="btn btn-sm btn-light" href="{{urls.chop}}">{{#str}}cleanup_chop_short, mod_buchbinder{{/str}}</a>
+                <a class="btn btn-sm btn-light" href="{{urls.deskew}}">{{#str}}cleanup_deskew_short, mod_buchbinder{{/str}}</a>
+                <a class="btn btn-sm btn-light" href="{{urls.shadow}}">{{#str}}cleanup_shadow_short, mod_buchbinder{{/str}}</a>
+                {{^isspread}}{{^landscapelock}}
+                <a class="btn btn-sm btn-light" href="{{urls.split}}">{{#str}}cleanup_split_short, mod_buchbinder{{/str}}</a>
+                {{/landscapelock}}{{/isspread}}
+                <a class="btn btn-sm btn-light" href="{{urls.lock}}">{{#landscapelock}}{{#str}}unprotect, mod_buchbinder{{/str}}{{/landscapelock}}{{^landscapelock}}{{#str}}protect, mod_buchbinder{{/str}}{{/landscapelock}}</a>
+                {{/isimage}}
+                {{#isspread}}<a class="btn btn-sm btn-light" href="{{urls.unlink}}">{{#str}}unlinkspread, mod_buchbinder{{/str}}</a>{{/isspread}}
+                {{#canlink}}<a class="btn btn-sm btn-light" href="{{urls.link}}">{{#str}}linkspread, mod_buchbinder{{/str}}</a>{{/canlink}}
+                <a class="btn btn-sm btn-outline-danger" href="{{urls.delete}}">{{#str}}delete{{/str}}</a>
+            </div>
+        </div>
+    </div>
+{{/pages}}
+</div>
+{{/haspages}}

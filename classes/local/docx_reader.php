@@ -1,0 +1,167 @@
+<?php
+// This file is part of Moodle - https://moodle.org/
+//
+// Moodle is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Moodle is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
+
+namespace mod_buchbinder\local;
+
+/**
+ * Minimal Word (.docx) to HTML conversion.
+ *
+ * Used when no document converter (e.g. fileconverter_unoconv) is available.
+ * Keeps headings, paragraphs, bold/italic runs, lists, tables and manual page breaks.
+ *
+ * @package    mod_buchbinder
+ * @copyright  2026 Buchbinder contributors
+ * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
+class docx_reader {
+    /** @var string WordprocessingML namespace. */
+    const NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+
+    /**
+     * Convert a docx file into html pages (split at manual page breaks).
+     *
+     * @param string $path
+     * @return string[]
+     */
+    public static function to_html_pages(string $path): array {
+        $zip = new \ZipArchive();
+        if ($zip->open($path) !== true) {
+            throw new \moodle_exception('errorimportformat', 'mod_buchbinder');
+        }
+        $xml = $zip->getFromName('word/document.xml');
+        $zip->close();
+        if ($xml === false) {
+            throw new \moodle_exception('errorimportformat', 'mod_buchbinder');
+        }
+        $dom = new \DOMDocument();
+        $dom->loadXML($xml, LIBXML_NONET);
+        $xpath = new \DOMXPath($dom);
+        $xpath->registerNamespace('w', self::NS);
+        $body = $xpath->query('/w:document/w:body')->item(0);
+        if (!$body) {
+            return [];
+        }
+        $pages = [];
+        $html = '';
+        $inlist = false;
+        foreach ($body->childNodes as $node) {
+            if ($node->namespaceURI !== self::NS) {
+                continue;
+            }
+            if ($node->localName === 'tbl') {
+                if ($inlist) {
+                    $html .= '</ul>';
+                    $inlist = false;
+                }
+                $html .= self::table($xpath, $node);
+                continue;
+            }
+            if ($node->localName !== 'p') {
+                continue;
+            }
+            $text = self::runs($xpath, $node);
+            $style = (string)$xpath->evaluate('string(w:pPr/w:pStyle/@w:val)', $node);
+            $islist = $xpath->query('w:pPr/w:numPr', $node)->length > 0;
+            if ($islist && !$inlist) {
+                $html .= '<ul>';
+                $inlist = true;
+            } else if (!$islist && $inlist) {
+                $html .= '</ul>';
+                $inlist = false;
+            }
+            if ($islist) {
+                $html .= '<li>' . $text . '</li>';
+            } else if (preg_match('/(?:Heading|berschrift|Title)\s*(\d?)/i', $style, $m)) {
+                $level = min(4, max(1, (int)($m[1] ?: 1)) + 1);
+                $html .= "<h{$level}>{$text}</h{$level}>";
+            } else if ($text !== '') {
+                $html .= '<p>' . $text . '</p>';
+            }
+            if ($xpath->query('.//w:br[@w:type="page"]', $node)->length > 0) {
+                if ($inlist) {
+                    $html .= '</ul>';
+                    $inlist = false;
+                }
+                $pages[] = $html;
+                $html = '';
+            }
+        }
+        if ($inlist) {
+            $html .= '</ul>';
+        }
+        if (trim($html) !== '') {
+            $pages[] = $html;
+        }
+        return $pages;
+    }
+
+    /**
+     * Html of the runs of a paragraph.
+     *
+     * @param \DOMXPath $xpath
+     * @param \DOMNode $p
+     * @return string
+     */
+    protected static function runs(\DOMXPath $xpath, \DOMNode $p): string {
+        $out = '';
+        foreach ($xpath->query('.//w:r', $p) as $run) {
+            $text = '';
+            foreach ($run->childNodes as $child) {
+                if ($child->localName === 't') {
+                    $text .= s($child->textContent);
+                } else if ($child->localName === 'tab') {
+                    $text .= ' ';
+                } else if ($child->localName === 'br' && $child->getAttributeNS(self::NS, 'type') !== 'page') {
+                    $text .= '<br>';
+                }
+            }
+            if ($text === '') {
+                continue;
+            }
+            if ($xpath->query('w:rPr/w:b[not(@w:val="0")]', $run)->length) {
+                $text = '<strong>' . $text . '</strong>';
+            }
+            if ($xpath->query('w:rPr/w:i[not(@w:val="0")]', $run)->length) {
+                $text = '<em>' . $text . '</em>';
+            }
+            $out .= $text;
+        }
+        return $out;
+    }
+
+    /**
+     * Html of a table.
+     *
+     * @param \DOMXPath $xpath
+     * @param \DOMNode $tbl
+     * @return string
+     */
+    protected static function table(\DOMXPath $xpath, \DOMNode $tbl): string {
+        $html = '<table class="table table-bordered">';
+        foreach ($xpath->query('w:tr', $tbl) as $tr) {
+            $html .= '<tr>';
+            foreach ($xpath->query('w:tc', $tr) as $tc) {
+                $cell = [];
+                foreach ($xpath->query('w:p', $tc) as $p) {
+                    $cell[] = self::runs($xpath, $p);
+                }
+                $html .= '<td>' . implode('<br>', $cell) . '</td>';
+            }
+            $html .= '</tr>';
+        }
+        return $html . '</table>';
+    }
+}
