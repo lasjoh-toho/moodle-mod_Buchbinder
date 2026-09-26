@@ -4,6 +4,9 @@
 #  1. Actions -> Release -> "Run workflow": enter the version (e.g. 0.4.0). The workflow updates
 #     version.php and CHANGES.md, commits, tags, tests and publishes the release.
 #  2. Update version.php and CHANGES.md yourself, then push a tag "v<release>" (e.g. v0.4.0).
+#  3. Create a release in the GitHub web interface (Releases -> Draft a new release). The ZIP is
+#     attached to it. Tags starting with "v" must match version.php, other tags (e.g. "latest")
+#     are accepted as they are.
 #
 # The release contains mod_buchbinder_<release>.zip, which can be installed via
 # Site administration -> Plugins -> Install plugins. Optionally the version is also uploaded to
@@ -13,6 +16,9 @@ name: Release
 on:
   push:
     tags: ['v*']
+  # Releases created in the GitHub web interface (any tag, e.g. "latest") get the ZIP attached.
+  release:
+    types: [published]
   workflow_dispatch:
     inputs:
       version:
@@ -30,7 +36,8 @@ permissions:
   contents: write
 
 concurrency:
-  group: release
+  # A tag created in the web interface can trigger both "push" and "release"; run them one after the other.
+  group: release-${{ github.event.release.tag_name || inputs.version || github.ref_name }}
   cancel-in-progress: false
 
 jobs:
@@ -62,6 +69,8 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "tag=v${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event_name }}" = "release" ]; then
+            echo "tag=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
           else
             echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
           fi
@@ -96,6 +105,7 @@ jobs:
           .github/scripts/release.sh notes > dist/notes.md
 
       - name: Create GitHub release
+        if: github.event_name != 'release'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.prepare.outputs.tag }}
@@ -103,6 +113,12 @@ jobs:
           body_path: dist/notes.md
           files: ${{ steps.build.outputs.zip }}
           prerelease: ${{ steps.build.outputs.maturity != 'MATURITY_STABLE' }}
+
+      - name: Attach ZIP to the release created in the web interface
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ needs.prepare.outputs.tag }}" "${{ steps.build.outputs.zip }}" --clobber
 
       - name: Upload to moodle.org plugins directory (optional)
         env:

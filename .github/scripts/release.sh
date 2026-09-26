@@ -75,6 +75,11 @@ case "${1:-}" in
         tag="${2:?tag required}"
         php -l version.php >/dev/null
         release=$(field release)
+        if [[ "$tag" != v* ]]; then
+            # Free tags such as "latest" from the web interface: no version rules.
+            echo "OK: $tag (no version tag), release $release, version $(field version)"
+            exit 0
+        fi
         if [ "$tag" != "v$release" ]; then
             echo "::error::Tag $tag does not match release '$release' in version.php (expected v$release)" >&2
             exit 1

@@ -171,6 +171,11 @@ Der Tag muss `v` + `$plugin->release` lauten und `CHANGES.md` einen Abschnitt f�
 enthalten, sonst bricht der Release ab. Das ZIP enthält den Ordner `buchbinder/` und wird unter
 *Website-Administration → Plugins → Plugin installieren* hochgeladen (oder nach `mod/` entpackt).
 
+**Variante 3 – über die GitHub-Oberfläche:** *Releases → Draft a new release*, Tag wählen oder neu
+anlegen und veröffentlichen. Der Workflow hängt das ZIP nach wenigen Minuten an das Release an
+(Name, Text und Vorabversion-Häkchen bleiben so, wie sie eingegeben wurden). Tags mit `v` müssen
+zur Version in `version.php` passen, andere Tags wie `latest` werden ohne Prüfung akzeptiert.
+
 **Optional: moodle.org.** Ist das Plugin im Moodle-Plugin-Verzeichnis registriert, lädt der
 Workflow jede Version automatisch hoch, sobald das Repository-Secret `MOODLE_ORG_TOKEN` gesetzt ist
 (Token unter moodle.org → Profil → Sicherheitsschlüssel, Dienst „Plugins directory API“).
