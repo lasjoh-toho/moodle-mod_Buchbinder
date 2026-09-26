@@ -48,8 +48,13 @@ final class layout_test extends \basic_testcase {
     }
 
     public function test_nup(): void {
-        $this->assertSame([[1, 2], [3, null]], imposition::sides(imposition::LAYOUT_2UP, 3));
-        $this->assertSame([[1, 2, 3, 4], [5, null, null, null]], imposition::sides(imposition::LAYOUT_4UP, 5));
+        // Page 1 is a right page: it goes into the right slot so that double pages stay together.
+        $this->assertSame([[null, 1], [2, 3]], imposition::sides(imposition::LAYOUT_2UP, 3));
+        $this->assertSame([[null, 1, 2, 3], [4, 5, null, null]], imposition::sides(imposition::LAYOUT_4UP, 5));
+        $this->assertSame([[1, 2], [3, null]], imposition::sides(imposition::LAYOUT_2UP, 3, false));
         $this->assertSame([[1], [2]], imposition::sides(imposition::LAYOUT_1UP, 2));
+        // A booklet starting with a left page gets a blank front page.
+        $this->assertSame([[null, null], [1, null]], imposition::sides(imposition::LAYOUT_BOOKLET, 1, false));
+        $this->assertSame(imposition::booklet(6), imposition::sides(imposition::LAYOUT_BOOKLET, 6));
     }
 }

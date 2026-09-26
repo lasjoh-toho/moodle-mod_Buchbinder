@@ -43,6 +43,18 @@ class booklet {
     /** @var array Margins in mm (type area). */
     const MARGINS_MM = ['top' => 20, 'bottom' => 25, 'inner' => 25, 'outer' => 18];
 
+    /** @var string Page style: type area of a regular book page. */
+    const STYLE_STANDARD = 'standard';
+    /** @var string Page style after Edward Tufte: narrow text column, wide outer margin for notes and small figures. */
+    const STYLE_TUFTE = 'tufte';
+
+    /** @var array Margins in mm of the Tufte style; the outer margin holds the note column. */
+    const MARGINS_TUFTE_MM = ['top' => 20, 'bottom' => 25, 'inner' => 20, 'outer' => 68];
+    /** @var float Space between text column and note column in mm. */
+    const NOTE_GAP_MM = 7;
+    /** @var float Space between note column and the outer edge of the page in mm. */
+    const NOTE_EDGE_MM = 12;
+
     /** @var int Pixel size of canvas pages (A4 at 150 dpi). */
     const CANVAS_WIDTH = 1240;
     /** @var int Pixel size of canvas pages (A4 at 150 dpi). */
@@ -64,10 +76,11 @@ class booklet {
      * Type area (content box) of a page, mirrored for left and right pages.
      *
      * @param string $side
+     * @param string|null $style page style (STYLE_STANDARD or STYLE_TUFTE)
      * @return float[] x, y, w, h relative to the page
      */
-    public static function type_area(string $side): array {
-        $m = self::MARGINS_MM;
+    public static function type_area(string $side, ?string $style = null): array {
+        $m = $style === self::STYLE_TUFTE ? self::MARGINS_TUFTE_MM : self::MARGINS_MM;
         $left = $side === self::RIGHT ? $m['inner'] : $m['outer'];
         $right = $side === self::RIGHT ? $m['outer'] : $m['inner'];
         return [
@@ -76,6 +89,36 @@ class booklet {
             (self::PAGE_WIDTH_MM - $left - $right) / self::PAGE_WIDTH_MM,
             (self::PAGE_HEIGHT_MM - $m['top'] - $m['bottom']) / self::PAGE_HEIGHT_MM,
         ];
+    }
+
+    /**
+     * Note column in the outer margin of Tufte style pages.
+     *
+     * The outer margin is on the right of right pages and on the left of left pages, so notes are
+     * always on the outside of the double page, also in print.
+     *
+     * @param string $side
+     * @return float[] x, y, w, h relative to the page
+     */
+    public static function note_area(string $side): array {
+        $m = self::MARGINS_TUFTE_MM;
+        $width = $m['outer'] - self::NOTE_GAP_MM - self::NOTE_EDGE_MM;
+        $x = $side === self::RIGHT ? self::PAGE_WIDTH_MM - self::NOTE_EDGE_MM - $width : self::NOTE_EDGE_MM;
+        return [
+            $x / self::PAGE_WIDTH_MM,
+            $m['top'] / self::PAGE_HEIGHT_MM,
+            $width / self::PAGE_WIDTH_MM,
+            (self::PAGE_HEIGHT_MM - $m['top'] - $m['bottom']) / self::PAGE_HEIGHT_MM,
+        ];
+    }
+
+    /**
+     * Known page styles.
+     *
+     * @return string[]
+     */
+    public static function styles(): array {
+        return [self::STYLE_STANDARD, self::STYLE_TUFTE];
     }
 
     /**

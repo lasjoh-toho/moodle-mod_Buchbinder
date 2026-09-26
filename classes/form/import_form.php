@@ -51,6 +51,11 @@ class import_form extends \moodleform {
         $mform->addHelpButton('files', 'importfiles', 'mod_buchbinder');
         $mform->addRule('files', null, 'required');
 
+        $mform->addElement('select', 'pagestyle', get_string('pagestyle', 'mod_buchbinder'), [
+            'standard' => get_string('pagestyle_standard', 'mod_buchbinder'),
+            'tufte' => get_string('pagestyle_tufte', 'mod_buchbinder'),
+        ]);
+        $mform->addHelpButton('pagestyle', 'pagestyle', 'mod_buchbinder');
         $mform->addElement('advcheckbox', 'startright', get_string('startright', 'mod_buchbinder'));
         $mform->setDefault('startright', 1);
         $mform->addHelpButton('startright', 'startright', 'mod_buchbinder');

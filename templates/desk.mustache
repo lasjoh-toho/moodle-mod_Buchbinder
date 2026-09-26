@@ -23,10 +23,12 @@
     {"name": "Textbook", "config": "{}", "hasglossaries": false, "issues": 0, "addpageurl": "#", "prevurl": "", "nexturl": "#",
      "double": true, "hasstages": true,
      "links": {"import": "#", "pages": "#", "sources": "#", "publish": "#", "preview": "#", "print": "#", "layout": "#", "course": "#"},
-     "spreads": [{"index": 0, "current": true, "url": "#", "label": "1", "double": false, "single": "right",
-                  "pages": [{"id": 1, "position": 1, "side": "right", "thumb": "", "frames": 1, "blank": false, "issue": false, "alignurl": "#"}]}],
+     "spreads": [{"index": 0, "current": true, "url": "#", "label": "1", "double": false, "single": "right", "chained": false,
+                  "pages": [{"id": 1, "position": 1, "side": "right", "thumb": "", "frames": 1, "blank": false, "issue": false,
+                             "alignurl": "#", "linked": "", "pinside": "right", "pinlabel": "R", "filler": false, "canlink": true}]}],
      "stages": [{"id": 1, "position": 1, "side": "right", "sidelabel": "right", "isimage": false, "imageurl": "", "html": "", "ratio": 141.4,
-                 "guidestyle": "left:10%;top:7%;width:80%;height:85%;", "issue": false, "alignurl": "#",
+                 "guidestyle": "left:10%;top:7%;width:80%;height:85%;", "noteguidestyle": "", "issue": false, "alignurl": "#",
+                 "filler": false, "pinlabel": "",
                  "actions": {"blankbefore": "#", "blankafter": "#", "moveup": "#", "movedown": "#", "delete": "#"} }]}
 }}
 <div class="bb-desk mod-buchbinder-editor" id="buchbinder-editor" data-config="{{config}}">
@@ -53,19 +55,26 @@
                 <div class="bb-desk-issues" role="alert">&#x26A0; {{#str}}layoutissues, mod_buchbinder, {{issues}}{{/str}}</div>
             {{/issues}}
             {{#spreads}}
-                <a class="bb-desk-spread{{#current}} current{{/current}}" href="{{url}}"{{#current}} aria-current="page"{{/current}}>
-                    <span class="bb-desk-spreadpages{{#single}} single-{{single}}{{/single}}">
+                <a class="bb-desk-spread{{#current}} current{{/current}}" href="{{url}}"{{#current}} aria-current="page"{{/current}}
+                    aria-haspopup="menu">
+                    <span class="bb-desk-spreadpages{{#single}} single-{{single}}{{/single}}{{#chained}} chained{{/chained}}">
                         {{#pages}}
-                            <span class="bb-desk-thumb bb-side-{{side}}{{#blank}} blank{{/blank}}{{#issue}} issue{{/issue}}">
+                            <span class="bb-desk-thumb bb-side-{{side}}{{#blank}} blank{{/blank}}{{#issue}} issue{{/issue}}{{#filler}} filler{{/filler}}"
+                                data-pageid="{{id}}" data-position="{{position}}" data-linked="{{linked}}" data-pinside="{{pinside}}"
+                                data-filler="{{#filler}}1{{/filler}}" data-canlink="{{#canlink}}1{{/canlink}}">
                                 {{#thumb}}<img src="{{thumb}}" alt="" loading="lazy">{{/thumb}}
                                 {{^thumb}}{{#frames}}<span class="bb-desk-thumblines"></span>{{/frames}}{{/thumb}}
+                                {{#pinlabel}}<span class="bb-desk-pin" title="{{#str}}pinnedpage, mod_buchbinder{{/str}}">{{pinlabel}}</span>{{/pinlabel}}
+                                {{#filler}}<span class="bb-desk-auto" title="{{#str}}fillerpage, mod_buchbinder{{/str}}">auto</span>{{/filler}}
                             </span>
                         {{/pages}}
+                        {{#chained}}<span class="bb-desk-chain" title="{{#str}}linkedpages, mod_buchbinder{{/str}}">&#x1F517;</span>{{/chained}}
                     </span>
                     <span class="bb-desk-spreadlabel">{{label}}</span>
                 </a>
             {{/spreads}}
             <a class="btn btn-sm btn-outline-secondary w-100 mt-2" href="{{addpageurl}}">+ {{#str}}addpage, mod_buchbinder{{/str}}</a>
+            <p class="bb-desk-hint">{{#str}}pagesmenuhint, mod_buchbinder{{/str}}</p>
         </aside>
         <div class="bb-desk-tools bb-editor-toolbar" role="toolbar" aria-label="{{#str}}tools, mod_buchbinder{{/str}}" aria-orientation="vertical">
             <button type="button" class="active" data-tool="select" aria-pressed="true" title="{{#str}}tool_select, mod_buchbinder{{/str}}"><span aria-hidden="true">&#x2196;</span><span class="bb-tool-label">{{#str}}tool_select, mod_buchbinder{{/str}}</span></button>
@@ -96,7 +105,9 @@
                 {{#stages}}
                 <div class="bb-desk-pagewrap bb-side-{{side}}">
                     <div class="bb-desk-pagehead">
-                        <span>{{#str}}pagex, mod_buchbinder, {{position}}{{/str}} · {{sidelabel}}</span>
+                        <span>{{#str}}pagex, mod_buchbinder, {{position}}{{/str}} · {{sidelabel}}
+                            {{#pinlabel}}<span class="bb-desk-pin" title="{{#str}}pinnedpage, mod_buchbinder{{/str}}">{{pinlabel}}</span>{{/pinlabel}}
+                            {{#filler}}<em class="bb-desk-autonote">{{#str}}fillerpage, mod_buchbinder{{/str}}</em>{{/filler}}</span>
                         <span class="bb-desk-pageactions">
                             <a href="{{actions.blankbefore}}" title="{{#str}}blankbefore, mod_buchbinder{{/str}}">+&#x2190;</a>
                             <a href="{{actions.blankafter}}" title="{{#str}}blankafter, mod_buchbinder{{/str}}">&#x2192;+</a>
@@ -113,15 +124,21 @@
                         {{#isimage}}<img class="bb-image" src="{{imageurl}}" alt="" draggable="false">{{/isimage}}
                         {{^isimage}}<div class="bb-html">{{{html}}}</div>{{/isimage}}
                         <div class="bb-guides" style="{{guidestyle}}" aria-hidden="true"></div>
+                        {{#noteguidestyle}}<div class="bb-guides bb-guides-notes" style="{{noteguidestyle}}" aria-hidden="true"></div>{{/noteguidestyle}}
                     </div>
                 </div>
                 {{/stages}}
             </div>
         </main>
-        <aside class="bb-editor-panel bb-desk-panel" aria-live="polite">
-            <div class="card-body">
-                <p class="text-muted small mb-0">{{#str}}selectoverlay, mod_buchbinder{{/str}}</p>
+        <aside class="bb-editor-panel bb-desk-panel dock-right" aria-label="{{#str}}properties, mod_buchbinder{{/str}}" hidden>
+            <div class="bb-desk-panelhead">
+                <strong>{{#str}}properties, mod_buchbinder{{/str}}</strong>
+                <button type="button" data-action="dock-panel" title="{{#str}}movepanel, mod_buchbinder{{/str}}"
+                    aria-label="{{#str}}movepanel, mod_buchbinder{{/str}}">&#x21C4;</button>
+                <button type="button" data-action="close-panel" title="{{#str}}closebuttontitle{{/str}}"
+                    aria-label="{{#str}}closebuttontitle{{/str}}">&#x2715;</button>
             </div>
+            <div class="bb-panel-body" aria-live="polite"></div>
         </aside>
     </div>
 </div>

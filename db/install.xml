@@ -61,6 +61,9 @@
         <FIELD NAME="landscapelock" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Protected wide content, never split"/>
         <FIELD NAME="spreadid" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false" COMMENT="Pages that belong to one scanned double page share this id"/>
         <FIELD NAME="spreadside" TYPE="char" LENGTH="5" NOTNULL="false" SEQUENCE="false" COMMENT="left or right"/>
+        <FIELD NAME="pinside" TYPE="char" LENGTH="5" NOTNULL="false" SEQUENCE="false" COMMENT="Intended side (left/right), kept by blank filler pages"/>
+        <FIELD NAME="filler" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Blank page inserted automatically to keep sides"/>
+        <FIELD NAME="pagestyle" TYPE="char" LENGTH="20" NOTNULL="false" SEQUENCE="false" COMMENT="Layout template of the page (e.g. tufte)"/>
         <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
       </FIELDS>
       <KEYS>

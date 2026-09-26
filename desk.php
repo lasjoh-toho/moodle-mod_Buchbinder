@@ -57,7 +57,20 @@ if ($action !== '') {
             $document->move_page($pageid, $action === 'moveup' ? -1 : 1);
             break;
         case 'align':
-            $document->align_spread($pageid);
+            $document->rebalance();
+            break;
+        case 'link':
+            $document->link_spread($pageid);
+            break;
+        case 'unlink':
+            $document->unlink_spread($pageid);
+            break;
+        case 'pinleft':
+        case 'pinright':
+            $document->set_pinside($pageid, $action === 'pinleft' ? booklet::LEFT : booklet::RIGHT);
+            break;
+        case 'unpin':
+            $document->set_pinside($pageid, null);
             break;
         case 'deletepage':
             $positions = array_keys($document->get_positions());
@@ -65,6 +78,10 @@ if ($action !== '') {
             $document->delete_page($pageid);
             $target = $positions[$index + 1] ?? ($positions[$index - 1] ?? 0);
             break;
+    }
+    if (!array_key_exists($target, $document->get_pages())) {
+        // Automatic blank pages may have disappeared.
+        $target = $pageid && array_key_exists($pageid, $document->get_pages()) ? $pageid : 0;
     }
     redirect(new moodle_url($baseurl, ['pageid' => $target]));
 }
@@ -74,7 +91,14 @@ $overlays = $document->get_overlays(array_map(fn($p) => (int)$p->id, $pages));
 $firstright = $document->first_page_right();
 $issues = [];
 foreach ($document->layout_issues() as $issue) {
-    $issues[$issue['leftpageid']] = true;
+    $issues[$issue['pageid']] = true;
+}
+// Pages that can be chained with the next ordinary page.
+$canlink = [];
+$ordinary = array_values(array_filter($pages, fn($p) => !$p->filler));
+foreach ($ordinary as $i => $page) {
+    $next = $ordinary[$i + 1] ?? null;
+    $canlink[$page->id] = $next && !$page->spreadid && !$next->spreadid;
 }
 
 // Spreads of the whole document.
@@ -114,9 +138,17 @@ foreach ($spreads as $index => $row) {
             'blank' => $page->pagetype === 'canvas' && !$overlays[$page->id],
             'issue' => isset($issues[$item['id']]),
             'alignurl' => $act('align', $item['id']),
+            'linked' => $page->spreadid ? (string)$page->spreadside : '',
+            'pinside' => (string)$page->pinside,
+            'pinlabel' => $page->pinside ? get_string('pinned_' . $page->pinside, 'mod_buchbinder') : '',
+            'filler' => (bool)$page->filler,
+            'canlink' => !empty($canlink[$page->id]),
         ];
     }
+    // Chain symbol between the halves of a double page.
+    $chained = count($thumbs) === 2 && $thumbs[0]['linked'] === 'left' && $thumbs[1]['linked'] === 'right';
     $panel[] = [
+        'chained' => $chained,
         'index' => $index,
         'current' => $index === $current,
         'url' => (new moodle_url($baseurl, ['pageid' => $row[0]['id']]))->out(false),
@@ -130,10 +162,19 @@ foreach ($spreads as $index => $row) {
 // The current spread on the pasteboard.
 $stages = [];
 $config = ['cmid' => $cm->id, 'pages' => [], 'overlays' => [], 'glossaries' => [],
-    'maxbytes' => document::max_bytes($context)];
+    'maxbytes' => document::max_bytes($context),
+    'actionurl' => (new moodle_url($baseurl, ['sesskey' => sesskey()]))->out(false)];
 foreach ($spreads[$current] ?? [] as $item) {
     $page = $item['page'];
-    $guides = booklet::type_area($item['side']);
+    $guides = booklet::type_area($item['side'], $page->pagestyle);
+    $notes = $page->pagestyle === booklet::STYLE_TUFTE ? booklet::note_area($item['side']) : null;
+    $box = fn($g) => sprintf(
+        'left:%.4f%%;top:%.4f%%;width:%.4f%%;height:%.4f%%;',
+        $g[0] * 100,
+        $g[1] * 100,
+        $g[2] * 100,
+        $g[3] * 100
+    );
     $stages[] = [
         'id' => $item['id'],
         'position' => $item['position'],
@@ -143,13 +184,8 @@ foreach ($spreads[$current] ?? [] as $item) {
         'imageurl' => $page->pagetype === 'image' ? $document->page_image_url($page)->out(false) : '',
         'html' => in_array($page->pagetype, ['html', 'layout']) ? $document->page_html($page) : '',
         'ratio' => $page->height ? round($page->height / max(1, $page->width) * 100, 4) : 141.4286,
-        'guidestyle' => sprintf(
-            'left:%.4f%%;top:%.4f%%;width:%.4f%%;height:%.4f%%;',
-            $guides[0] * 100,
-            $guides[1] * 100,
-            $guides[2] * 100,
-            $guides[3] * 100
-        ),
+        'guidestyle' => $box($guides),
+        'noteguidestyle' => $notes ? $box($notes) : '',
         'actions' => [
             'blankbefore' => $act('blankbefore', $item['id']),
             'blankafter' => $act('blankafter', $item['id']),
@@ -159,8 +195,10 @@ foreach ($spreads[$current] ?? [] as $item) {
         ],
         'issue' => isset($issues[$item['id']]),
         'alignurl' => $act('align', $item['id']),
+        'filler' => (bool)$page->filler,
+        'pinlabel' => $page->pinside ? get_string('pinned_' . $page->pinside, 'mod_buchbinder') : '',
     ];
-    $config['pages'][] = ['pageid' => $item['id'], 'side' => $item['side'], 'guides' => $guides];
+    $config['pages'][] = ['pageid' => $item['id'], 'side' => $item['side'], 'guides' => $guides, 'notes' => $notes];
     foreach ($overlays[$page->id] as $o) {
         $url = $o->overlaytype === 'imageframe' ? $document->frame_image_url($o) : $document->audio_url($o);
         $config['overlays'][] = ['id' => (int)$o->id, 'pageid' => (int)$o->pageid, 'type' => $o->overlaytype,

@@ -31,7 +31,10 @@ class importer {
     /** @var document */
     protected $document;
 
-    /** @var array options: chop, deskew, shadow, split (scans), startright (documents start on a right page) */
+    /**
+     * @var array options: chop, deskew, shadow, split (scans), startright (documents start on a right page),
+     *      tufte (documents are set in the Tufte page style instead of keeping their formatting)
+     */
     protected $ops;
 
     /** @var int */
@@ -99,11 +102,16 @@ class importer {
                 return $this->import_docx($file, $sourceid);
             case 'html':
                 $html = self::html_body($file->get_content());
-                return $this->flow(blocks::from_html($html, $this->web_image_resolver($meta['url'] ?? '')), $sourceid);
+                return $this->flow(blocks::from_html(
+                    $html,
+                    $this->web_image_resolver($meta['url'] ?? ''),
+                    $this->has_notes()
+                ), $sourceid);
             case 'md':
                 return $this->flow(blocks::from_markdown(
                     $file->get_content(),
-                    $this->web_image_resolver($meta['url'] ?? '')
+                    $this->web_image_resolver($meta['url'] ?? ''),
+                    $this->has_notes()
                 ), $sourceid);
             case 'cbz':
                 return $this->import_archive($file, $sourceid);
@@ -128,12 +136,12 @@ class importer {
             $gutter = image_cleanup::find_gutter($img);
             if ($gutter !== null) {
                 [$left, $right] = image_cleanup::split($img, $gutter);
-                // The left half must lie on a left page of the booklet: add a blank page if necessary.
-                $this->document->pad_to_side(booklet::LEFT);
                 $page = $this->document->add_image_page($left, $sourceid, ['spreadside' => 'left']);
                 global $DB;
                 $DB->set_field('buchbinder_page', 'spreadid', $page->id, ['id' => $page->id]);
                 $this->document->add_image_page($right, $sourceid, ['spreadid' => $page->id, 'spreadside' => 'right']);
+                // The left half must lie on a left page of the booklet: add a blank page if necessary.
+                $this->document->rebalance();
                 return 2;
             }
         }
@@ -192,7 +200,25 @@ class importer {
             @unlink($path);
         }
         $media = $doc['media'];
-        return $this->flow(blocks::from_html($doc['html'], fn($src) => $media[$src] ?? null), $sourceid);
+        return $this->flow(blocks::from_html($doc['html'], fn($src) => $media[$src] ?? null, $this->has_notes()), $sourceid);
+    }
+
+    /**
+     * Page style for documents set as frames.
+     *
+     * @return string booklet::STYLE_*
+     */
+    public function style(): string {
+        return in_array(booklet::STYLE_TUFTE, $this->ops) ? booklet::STYLE_TUFTE : booklet::STYLE_STANDARD;
+    }
+
+    /**
+     * Whether notes go into a note column (instead of staying in the text).
+     *
+     * @return bool
+     */
+    protected function has_notes(): bool {
+        return $this->style() === booklet::STYLE_TUFTE;
     }
 
     /**
@@ -203,7 +229,7 @@ class importer {
      * @return int number of pages created
      */
     public function flow(array $blocks, ?int $sourceid): int {
-        $flow = new flow($this->document, $sourceid);
+        $flow = new flow($this->document, $sourceid, $this->style());
         return count($flow->run($blocks, in_array('startright', $this->ops)));
     }
 
@@ -345,8 +371,8 @@ class importer {
             $name = rawurldecode(preg_replace('#^@@PLUGINFILE@@/#', '', $src));
             return isset($images[$name]) ? ['data' => $images[$name], 'filename' => $name] : null;
         };
-        $flow = new flow($this->document, $sourceid);
-        $pages = $flow->run(blocks::from_html($html, $resolver), in_array('startright', $this->ops));
+        $flow = new flow($this->document, $sourceid, $this->style());
+        $pages = $flow->run(blocks::from_html($html, $resolver, $this->has_notes()), in_array('startright', $this->ops));
         return $pages[0] ?? $this->document->add_canvas_page(null, ['sourceid' => $sourceid]);
     }
 }

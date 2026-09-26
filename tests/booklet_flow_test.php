@@ -235,13 +235,93 @@ final class booklet_flow_test extends \advanced_testcase {
         $this->assertSame('left', $pages[1]->spreadside);
         $this->assertSame([], $document->layout_issues());
 
-        // Deleting the blank page breaks the double page; align_spread() repairs it.
+        // The blank page is an automatic one: deleting it does not break the double page.
+        $this->assertEquals(1, $pages[0]->filler);
         $document->delete_page((int)$pages[0]->id);
-        $issues = $document->layout_issues();
-        $this->assertCount(1, $issues);
-        $this->assertTrue($document->align_spread($issues[0]['leftpageid']));
         $this->assertSame([], $document->layout_issues());
+        $this->assertCount(3, $document->get_pages());
         $this->assertSame('canvas', array_values($document->get_pages())[0]->pagetype);
+        // Unchaining releases the halves: the automatic blank page is gone.
+        $document->unlink_spread((int)$pages[1]->id);
+        $this->assertCount(2, $document->get_pages());
+        // Chaining again (page 1 is a right page) brings it back.
+        $document->link_spread((int)$pages[1]->id);
+        $this->assertCount(3, $document->get_pages());
+        $this->assertSame('left', array_values($document->get_pages())[1]->spreadside);
+    }
+
+    public function test_tufte_notes_in_outer_margin(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        $document = $this->create_document();
+        $markdown = "# Kapitel\n\nText mit Fußnote.[^a] Und eine Randnotiz.\n\n"
+            . "<span class=\"marginnote\">Am Rand</span>\n\n::: {.column-margin}\nQuarto-Rand\n:::\n\n"
+            . "[^a]: Die Fußnote.\n";
+        $blocks = blocks::from_markdown($markdown, null, true);
+        $text = array_values(array_filter($blocks, fn($b) => $b['type'] === 'text'));
+        $this->assertStringContainsString('Fußnote.<sup>1</sup>', $text[1]['html']);
+        $this->assertStringContainsString('<sup>1</sup> Die Fußnote.', $text[1]['notes'][0]);
+        $this->assertStringNotContainsString('footnotes', implode('', array_column($text, 'html')));
+        $notes = implode('', array_merge(...array_map(fn($b) => $b['notes'] ?? [], $text)));
+        $this->assertStringContainsString('Am Rand', $notes);
+        $this->assertStringContainsString('Quarto-Rand', $notes);
+
+        // Without notes the footnotes stay at the end of the text.
+        $plain = blocks::from_markdown($markdown);
+        $this->assertStringContainsString('Die Fußnote.', implode('', array_column($plain, 'html')));
+
+        // Set in the Tufte style: pages 1 (right) and 2 (left) have their notes in the outer margin.
+        $importer = new importer($document, [booklet::STYLE_TUFTE]);
+        $long = str_repeat('Langer Absatz mit vielen Wörtern für die Textspalte. ', 60);
+        $md = "Erster Absatz.[^1]\n\n{$long}\n\nZweiter Teil.[^2] {$long}\n\n[^1]: Rechts.\n\n[^2]: Links.\n";
+        $sourceid = $document->add_source('md', []);
+        $this->assertGreaterThanOrEqual(2, $importer->flow(blocks::from_markdown($md, null, true), $sourceid));
+        $pages = array_values($document->get_pages());
+        $this->assertSame(booklet::STYLE_TUFTE, $pages[0]->pagestyle);
+        $overlays = $document->get_overlays(array_map(fn($p) => $p->id, $pages));
+        $this->assertGreaterThan(0.5, booklet::note_area(booklet::RIGHT)[0]);
+        $this->assertLessThan(0.1, booklet::note_area(booklet::LEFT)[0]);
+        $notes = [];
+        foreach ($pages as $i => $page) {
+            $side = $document->side_at($i + 1);
+            foreach ($overlays[$page->id] as $o) {
+                if ($o->settings['style'] === 'sidenote') {
+                    // Notes are always in the outer margin: right on right pages, left on left pages.
+                    $this->assertEqualsWithDelta(booklet::note_area($side)[0], (float)$o->x, 0.0001);
+                    $notes[$side] = strip_tags($o->settings['html']);
+                } else if ($o->overlaytype === 'textframe') {
+                    $this->assertSame('tufte', $o->settings['style']);
+                }
+            }
+        }
+        $this->assertStringContainsString('Rechts.', $notes[booklet::RIGHT]);
+        $this->assertStringContainsString('Links.', $notes[booklet::LEFT]);
+        $right = booklet::note_area(booklet::RIGHT);
+        // The text column is narrower than the standard type area and leaves the outer margin free.
+        $area = booklet::type_area(booklet::RIGHT, booklet::STYLE_TUFTE);
+        $this->assertLessThan($right[0], $area[0] + $area[2]);
+    }
+
+    public function test_docx_footnotes(): void {
+        $path = make_request_directory() . '/notes.docx';
+        $zip = new \ZipArchive();
+        $zip->open($path, \ZipArchive::CREATE);
+        $zip->addFromString('word/document.xml', '<?xml version="1.0"?>
+            <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>
+            <w:p><w:r><w:t>Satz</w:t></w:r><w:r><w:footnoteReference w:id="2"/></w:r></w:p>
+            </w:body></w:document>');
+        $zip->addFromString('word/footnotes.xml', '<?xml version="1.0"?>
+            <w:footnotes xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+            <w:footnote w:type="separator" w:id="-1"><w:p><w:r><w:separator/></w:r></w:p></w:footnote>
+            <w:footnote w:id="2"><w:p><w:r><w:footnoteRef/></w:r><w:r><w:t>Quelle</w:t></w:r></w:p></w:footnote>
+            </w:footnotes>');
+        $zip->close();
+        $html = \mod_buchbinder\local\docx_reader::to_html($path)['html'];
+        $this->assertStringContainsString('<sup><a href="#fn:1" class="footnote-ref">1</a></sup>', $html);
+        $this->assertStringContainsString('<li id="fn:1"><p>Quelle</p></li>', $html);
+        $blocks = blocks::from_html($html, null, true);
+        $this->assertSame('<p>Satz<sup>1</sup></p>', $blocks[0]['html']);
+        $this->assertSame(['<p><sup>1</sup> Quelle</p>'], $blocks[0]['notes']);
     }
 
     public function test_blank_pages_and_moving_frames(): void {

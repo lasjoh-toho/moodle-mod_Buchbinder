@@ -5,6 +5,22 @@ neuen Version (siehe README, „Release erstellen“).
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-09-26
+
+- Seitenpalette mit Kontextmenü (Rechtsklick oder Kontextmenü-Taste): Seiten mit der Folgeseite
+  verketten (Kettensymbol) und als linke oder rechte Seite festlegen (L/R)
+- Automatische Leerseiten halten verkettete und festgelegte Seiten beim Einfügen, Löschen und
+  Verschieben auf ihrer Seite und verschwinden wieder, wenn sie nicht mehr gebraucht werden
+- Eigenschaften-Panel erscheint nur bei Auswahl, schwebt gegenüber der bearbeiteten Seite und lässt
+  sich auf die andere Seite verschieben
+- Formatvorlage „Tufte“ für Word, HTML, Markdown und Web-Ausschnitte: schmale Textspalte, Serifenschrift,
+  breiter Außenrand mit Fußnoten, Randnotizen und kleinen Abbildungen neben dem Text; Rahmen-Formatierung
+  im Panel umstellbar
+- Fußnoten aus Word werden übernommen
+- Druck mit 2 oder 4 Seiten pro Blatt hält Doppelseiten ein, Außenränder und Notizen liegen außen
+- Behoben: Fehler „errornotimage“, wenn das Ausschnitt-Werkzeug auf einer Rahmenseite benutzt wurde;
+  das Werkzeug ist jetzt nur auf Bildseiten aktiv
+
 ## [0.5.0] - 2026-09-26
 
 - Broschüren-Modell: Jede Seite liegt links oder rechts (Seite 1 rechts, dann Doppelseiten 2|3, 4|5 …),

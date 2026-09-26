@@ -626,6 +626,45 @@
     padding: .15em .4em;
 }
 
+/* Page style after Edward Tufte: serif text, italic headings without bold, notes in the outer margin. */
+.path-mod-buchbinder .bb-style-tufte,
+.path-mod-buchbinder .bb-style-sidenote {
+    font-family: "ET Book", Palatino, "Palatino Linotype", "Book Antiqua", Georgia, serif;
+    color: #111;
+}
+
+.path-mod-buchbinder .bb-style-tufte h1,
+.path-mod-buchbinder .bb-style-tufte h2,
+.path-mod-buchbinder .bb-style-tufte h3,
+.path-mod-buchbinder .bb-style-tufte h4 {
+    font-style: italic;
+    font-weight: normal;
+}
+
+.path-mod-buchbinder .bb-style-tufte h1 {
+    font-size: 2.2em;
+}
+
+.path-mod-buchbinder .bb-style-tufte blockquote {
+    font-style: italic;
+    margin-left: 1.5em;
+}
+
+.path-mod-buchbinder .bb-style-tufte table td,
+.path-mod-buchbinder .bb-style-tufte table th {
+    border-width: 0 0 1px;
+}
+
+.path-mod-buchbinder .bb-style-tufte sup,
+.path-mod-buchbinder .bb-style-sidenote sup {
+    font-size: .7em;
+    line-height: 1;
+}
+
+.path-mod-buchbinder .bb-style-sidenote p {
+    margin-bottom: .3em;
+}
+
 .path-mod-buchbinder .bb-frame-border {
     outline: 1px solid #333;
 }
@@ -717,7 +756,8 @@
     flex: 1 1 auto;
     min-height: 0;
     display: grid;
-    grid-template-columns: 170px 56px minmax(0, 1fr) 300px;
+    grid-template-columns: 170px 56px minmax(0, 1fr);
+    position: relative;
 }
 
 .bb-desk .bb-desk-pages {
@@ -881,7 +921,7 @@
 }
 
 .bb-desk .bb-desk-next {
-    right: 312px;
+    right: 12px;
 }
 
 .bb-desk .bb-desk-empty {
@@ -958,11 +998,168 @@
 }
 
 .bb-desk .bb-desk-panel {
-    position: static;
+    position: absolute;
+    top: .75rem;
+    z-index: 20;
+    width: 300px;
+    max-height: calc(100% - 1.5rem);
     overflow-y: auto;
-    border-radius: 0;
+    border-radius: 4px;
     background: #f8f9fa;
     color: #212529;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, .45);
+}
+
+.bb-desk .bb-desk-panel[hidden] {
+    display: none;
+}
+
+.bb-desk .bb-desk-panel.dock-right {
+    right: .75rem;
+}
+
+.bb-desk .bb-desk-panel.dock-left {
+    left: calc(226px + .75rem);
+}
+
+.bb-desk .bb-desk-panelhead {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    gap: .25rem;
+    padding: .35rem .5rem;
+    background: #343a40;
+    color: #fff;
+    font-size: 13px;
+}
+
+.bb-desk .bb-desk-panelhead strong {
+    flex: 1 1 auto;
+}
+
+.bb-desk .bb-desk-panelhead button {
+    border: 0;
+    background: transparent;
+    color: #fff;
+    padding: 0 .35rem;
+    font-size: 15px;
+}
+
+.bb-desk .bb-desk-panelhead button:hover,
+.bb-desk .bb-desk-panelhead button:focus-visible {
+    background: rgba(255, 255, 255, .15);
+}
+
+.bb-desk .bb-guides-notes {
+    border-color: rgba(12, 166, 120, .6);
+}
+
+.bb-desk .bb-desk-spreadpages {
+    position: relative;
+}
+
+.bb-desk .bb-desk-chain {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #1971c2;
+    color: #fff;
+    font-size: 11px;
+    line-height: 20px;
+    box-shadow: 0 0 0 2px #2c3035;
+}
+
+.bb-desk .bb-desk-pin {
+    display: inline-block;
+    min-width: 14px;
+    padding: 0 3px;
+    border-radius: 3px;
+    background: #e8590c;
+    color: #fff;
+    font: bold 10px/14px sans-serif;
+    text-align: center;
+}
+
+.bb-desk .bb-desk-thumb .bb-desk-pin {
+    position: absolute;
+    top: 2px;
+}
+
+.bb-desk .bb-desk-thumb.bb-side-left .bb-desk-pin {
+    left: 2px;
+}
+
+.bb-desk .bb-desk-thumb.bb-side-right .bb-desk-pin {
+    right: 2px;
+}
+
+.bb-desk .bb-desk-thumb.filler {
+    background: repeating-linear-gradient(135deg, #f1f3f5 0, #f1f3f5 6px, #e2e6ea 6px, #e2e6ea 12px);
+}
+
+.bb-desk .bb-desk-auto {
+    position: absolute;
+    right: 0;
+    bottom: 2px;
+    left: 0;
+    color: #868e96;
+    font-size: 9px;
+}
+
+.bb-desk .bb-desk-autonote {
+    margin-left: .4rem;
+    color: #adb5bd;
+}
+
+.bb-desk .bb-desk-hint {
+    margin: .5rem 0 0;
+    color: #adb5bd;
+    font-size: 11px;
+}
+
+.path-mod-buchbinder .bb-desk-contextmenu {
+    position: fixed;
+    z-index: 1100;
+    min-width: 220px;
+    padding: .25rem 0;
+    background: #fff;
+    color: #212529;
+    border: 1px solid #adb5bd;
+    border-radius: 4px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, .35);
+    font-size: 13px;
+}
+
+.path-mod-buchbinder .bb-desk-contextmenu button {
+    display: block;
+    width: 100%;
+    padding: .3rem .8rem;
+    border: 0;
+    background: transparent;
+    text-align: left;
+}
+
+.path-mod-buchbinder .bb-desk-contextmenu button:hover,
+.path-mod-buchbinder .bb-desk-contextmenu button:focus {
+    background: #1971c2;
+    color: #fff;
+    outline: none;
+}
+
+.path-mod-buchbinder .bb-desk-contextmenu hr {
+    margin: .25rem 0;
+}
+
+.path-mod-buchbinder .bb-desk-contextnote {
+    padding: .3rem .8rem;
+    color: #6c757d;
+    font-style: italic;
 }
 
 .bb-desk .bb-format-tools .btn {
@@ -1026,10 +1223,10 @@
 
 @media (max-width: 1199.98px) {
     .bb-desk .bb-desk-main {
-        grid-template-columns: 110px 52px minmax(0, 1fr) 260px;
+        grid-template-columns: 110px 52px minmax(0, 1fr);
     }
 
-    .bb-desk .bb-desk-next {
-        right: 272px;
+    .bb-desk .bb-desk-panel.dock-left {
+        left: 170px;
     }
 }

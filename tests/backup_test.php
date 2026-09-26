@@ -46,7 +46,8 @@ final class backup_test extends \advanced_testcase {
     protected function create_fixture(): array {
         $course = $this->getDataGenerator()->create_course();
         $glossary = $this->getDataGenerator()->create_module('glossary', ['course' => $course->id]);
-        $instance = $this->getDataGenerator()->create_module('buchbinder', ['course' => $course->id, 'pagerange' => '1-3']);
+        $instance = $this->getDataGenerator()->create_module('buchbinder', ['course' => $course->id, 'pagerange' => '1-3',
+            'firstpageright' => 0]);
         $document = document::from_cmid($instance->cmid);
         $importer = new importer($document);
         $importer->add_blank_pages('lined', 2, false);

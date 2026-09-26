@@ -48,6 +48,11 @@ class web_form extends \moodleform {
         $mform->addElement('text', 'selector', get_string('selector', 'mod_buchbinder'), ['size' => 30]);
         $mform->setType('selector', PARAM_TEXT);
         $mform->addHelpButton('selector', 'selector', 'mod_buchbinder');
+        $mform->addElement('select', 'pagestyle', get_string('pagestyle', 'mod_buchbinder'), [
+            'standard' => get_string('pagestyle_standard', 'mod_buchbinder'),
+            'tufte' => get_string('pagestyle_tufte', 'mod_buchbinder'),
+        ]);
+        $mform->addHelpButton('pagestyle', 'pagestyle', 'mod_buchbinder');
         $mform->addElement('text', 'author', get_string('sourceauthor', 'mod_buchbinder'), ['size' => 60]);
         $mform->setType('author', PARAM_TEXT);
         $this->add_action_buttons(false, get_string('harvest', 'mod_buchbinder'));

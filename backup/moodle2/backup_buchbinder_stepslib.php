@@ -42,7 +42,7 @@ class backup_buchbinder_activity_structure_step extends backup_activity_structur
         $pages = new backup_nested_element('pages');
         $page = new backup_nested_element('page', ['id'], [
             'sourceid', 'sortorder', 'pagetype', 'content', 'contentformat', 'width', 'height', 'landscapelock',
-            'spreadid', 'spreadside', 'timemodified']);
+            'spreadid', 'spreadside', 'pinside', 'filler', 'pagestyle', 'timemodified']);
 
         $overlays = new backup_nested_element('overlays');
         $overlay = new backup_nested_element('overlay', ['id'], [

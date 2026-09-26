@@ -108,7 +108,8 @@ foreach ($pages as $page) {
                 $html = format_text($s['html'], FORMAT_HTML, ['context' => $context]);
                 $ov += ['html' => $html, 'framestyle' => '--bb-scale:' . $s['fontscale'] . ';' .
                     ($s['bgcolor'] ? 'background:' . $s['bgcolor'] . ';' : '') .
-                    ($s['columns'] > 1 ? 'column-count:' . $s['columns'] . ';' : ''), 'border' => $s['border']];
+                    ($s['columns'] > 1 ? 'column-count:' . $s['columns'] . ';' : ''), 'border' => $s['border'],
+                    'styleclass' => !empty($s['style']) ? 'bb-style-' . $s['style'] : ''];
                 // Text frames are also the content of the text view on smartphones.
                 $reflow[] = ['y' => (float)$o->y, 'x' => (float)$o->x, 'html' => $html];
                 break;

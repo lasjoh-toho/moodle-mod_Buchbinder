@@ -23,15 +23,30 @@ gespiegelt, der Bundsteg liegt immer an der Bindung.
   verteilt. Lange Absätze, Listen und Tabellen werden auf Folgeseiten fortgesetzt, Überschriften
   bleiben beim folgenden Text, Seitenumbrüche aus Word/Markdown werden übernommen. Dokumente
   beginnen auf Wunsch auf einer rechten Seite.
-- **Leerseiten:** Gescannte Doppelseiten werden so platziert, dass die linke Hälfte links liegt –
-  wo nötig mit automatisch eingefügter Leerseite. Liegt eine Doppelseite später falsch (z. B. nach
-  dem Löschen einer Seite), wird sie markiert und lässt sich per Klick ausrichten. Leerseiten
-  lassen sich außerdem vor oder nach jeder Seite einfügen.
+- **Seitenlage als bewusste Entscheidung:** In der Seitenpalette öffnet ein Rechtsklick (oder die
+  Kontextmenü-Taste) die Seiteneigenschaften: Seiten mit der Folgeseite **verketten** (Kettensymbol,
+  eine Doppelseite) und Seiten als **linke oder rechte Seite festlegen** (Markierung L/R). Werden
+  davor Seiten eingefügt, gelöscht oder verschoben, bleiben verkettete und festgelegte Seiten auf
+  ihrer Seite: **automatische Leerseiten** (schraffiert) werden eingefügt und verschwinden wieder,
+  sobald sie nicht mehr gebraucht werden. Erst wenn eine Seite freigegeben wird, verschiebt sie sich.
+  Gescannte Doppelseiten sind automatisch verkettet, Dokumente mit „rechts beginnen“ automatisch
+  auf rechts festgelegt. Leerseiten lassen sich außerdem vor oder nach jeder Seite einfügen.
+- **Formatvorlage Tufte:** Soll die Formatierung der Quelle nicht übernommen werden, setzt die
+  Vorlage „Tufte“ (nach den Büchern von Edward Tufte, vgl. Tufte CSS) Dokumente und Webseiten in
+  eine schmale Textspalte in Serifenschrift mit kursiven Überschriften und einem breiten Außenrand.
+  Fußnoten (Markdown, Word, HTML), Randnotizen (`<span class="sidenote">`, `<span class="marginnote">`,
+  Quarto `::: {.column-margin}`, `<aside>`) und kleine Abbildungen stehen dort neben der Zeile, auf
+  die sie sich beziehen. Die breiten Ränder liegen immer außen – auch im Druck.
 - **Satzstudio (`desk.php`):** Vollbild-Arbeitsplatz im Stil von DTP-Programmen mit Seitenpalette
-  (Doppelseiten-Miniaturen), Werkzeugleiste, Montagefläche mit der aktuellen Doppelseite,
-  Satzspiegel-Hilfslinien mit Einrasten und Eigenschaften-Panel. Rahmen lassen sich über den Bund
-  auf die andere Seite ziehen; Doppelklick bearbeitet den Text direkt im Rahmen (fett, kursiv,
-  Überschriften, Listen), ein rotes „+“ zeigt Übersatz an.
+  (Doppelseiten-Miniaturen), Werkzeugleiste, Montagefläche mit der aktuellen Doppelseite und
+  Satzspiegel-Hilfslinien (bei Tufte-Seiten mit Notizspalte) mit Einrasten. Das Eigenschaften-Panel
+  erscheint nur, wenn ein Rahmen oder Objekt ausgewählt ist, und schwebt auf der Seite gegenüber der
+  bearbeiteten Seite; mit ⇄ lässt es sich auf die andere Seite verschieben, Esc schließt es. Rahmen
+  lassen sich über den Bund auf die andere Seite ziehen; Doppelklick bearbeitet den Text direkt im
+  Rahmen (fett, kursiv, Überschriften, Listen), ein rotes „+“ zeigt Übersatz an. Ausschnitt-Werkzeug
+  und Spaltenerkennung stehen auf Bildseiten (Scans, PDF-Seiten) zur Verfügung.
+- **Druck:** Bei 2 und 4 Seiten pro Blatt und bei der Broschüre werden Doppelseiten eingehalten
+  (Seite 1 rechts), sodass Außenränder und Notizen außen liegen.
 
 ## Arbeitsablauf im Publishing Studio
 

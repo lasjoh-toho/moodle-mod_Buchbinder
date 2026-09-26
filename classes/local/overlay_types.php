@@ -116,6 +116,7 @@ class overlay_types {
                     'bgcolor' => ($data['bgcolor'] ?? '') === '' ? '' : self::color($data['bgcolor'], ''),
                     'border' => !empty($data['border']),
                     'columns' => max(1, min(3, (int)($data['columns'] ?? 1))),
+                    'style' => in_array($data['style'] ?? '', ['tufte', 'sidenote'], true) ? $data['style'] : '',
                 ];
             case self::IMAGEFRAME:
                 return [

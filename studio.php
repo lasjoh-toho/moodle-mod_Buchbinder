@@ -139,7 +139,8 @@ switch ($tab) {
         if ($form === 'web' && $webform && ($data = $webform->get_data())) {
             try {
                 $result = harvester::harvest($data->url, $data->selector ?? '', $maxbytes);
-                $page = (new importer($document))->add_snippet('web', $result['html'], $result['images'], [
+                $importer = new importer($document, [$data->pagestyle ?? 'standard']);
+                $page = $importer->add_snippet('web', $result['html'], $result['images'], [
                     'title' => $result['title'], 'url' => $result['url'], 'author' => $data->author ?? '',
                 ]);
                 redirect(
@@ -155,7 +156,8 @@ switch ($tab) {
             $fs = get_file_storage();
             $usercontext = context_user::instance($USER->id);
             $ops = array_keys(array_filter(['chop' => $data->chop, 'deskew' => $data->deskew, 'shadow' => $data->shadow,
-                'split' => $data->split, 'startright' => $data->startright]));
+                'split' => $data->split, 'startright' => $data->startright,
+                'tufte' => ($data->pagestyle ?? '') === 'tufte']));
             $files = $fs->get_area_files($usercontext->id, 'user', 'draft', $draftid, 'sortorder, filename', false);
             $job = import_queue::enqueue($document, array_values($files), $ops, ['title' => $data->title,
                 'author' => $data->author, 'url' => $data->url ?: null]);

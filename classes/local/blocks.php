@@ -26,6 +26,10 @@ namespace mod_buchbinder\local;
  *     'width' => int, 'height' => int]
  *  - ['type' => 'pagebreak']
  *
+ * With notes enabled, footnotes (Markdown Extra, Pandoc, Word) and side or margin notes
+ * (Tufte CSS: span.sidenote, span.marginnote; Quarto: .column-margin; aside) are taken out of the
+ * text and attached to the text block that references them as 'notes' => string[] (html).
+ *
  * @package    mod_buchbinder
  * @copyright  2026 Buchbinder contributors
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -47,16 +51,24 @@ class blocks {
     /** @var \DOMDocument */
     protected $dom;
 
+    /** @var bool take notes out of the text */
+    protected $withnotes = false;
+
+    /** @var array[] collected notes: ['html' => string, 'numbered' => bool] */
+    protected $notes = [];
+
     /**
      * Split html into blocks.
      *
      * @param string $html
      * @param callable|null $resolveimage returns image data for a src or null
+     * @param bool $notes take footnotes and margin notes out of the text (for page styles with a note column)
      * @return array blocks
      */
-    public static function from_html(string $html, ?callable $resolveimage = null): array {
+    public static function from_html(string $html, ?callable $resolveimage = null, bool $notes = false): array {
         $splitter = new self();
         $splitter->resolveimage = $resolveimage ?? fn($src) => null;
+        $splitter->withnotes = $notes;
         return $splitter->split($html);
     }
 
@@ -65,16 +77,23 @@ class blocks {
      *
      * @param string $markdown
      * @param callable|null $resolveimage
+     * @param bool $notes take footnotes and margin notes out of the text
      * @return array
      */
-    public static function from_markdown(string $markdown, ?callable $resolveimage = null): array {
+    public static function from_markdown(string $markdown, ?callable $resolveimage = null, bool $notes = false): array {
         // Quarto/Pandoc page breaks and "\newpage".
         $markdown = preg_replace(
             '/^\s*(\{\{<\s*pagebreak\s*>\}\}|\\\\newpage)\s*$/m',
             "\n<hr class=\"bb-pagebreak\">\n",
             $markdown
         );
-        return self::from_html(markdown_to_html($markdown), $resolveimage);
+        // Quarto margin content (a ::: {.column-margin} block) becomes a margin note.
+        $markdown = preg_replace_callback(
+            '/^:::+\s*\{\.(column-margin|aside)\}\s*\n(.*?)\n:::+\s*$/ms',
+            fn($m) => '<div class="column-margin" markdown="1">' . "\n\n" . $m[2] . "\n\n</div>",
+            $markdown
+        );
+        return self::from_html(markdown_to_html($markdown), $resolveimage, $notes);
     }
 
     /**
@@ -100,8 +119,169 @@ class blocks {
                 $node->parentNode->removeChild($node);
             }
         }
+        if ($this->withnotes) {
+            $this->collect_notes();
+        }
         $this->walk($body);
-        return $this->blocks;
+        return $this->withnotes ? $this->attach_notes($this->blocks) : $this->blocks;
+    }
+
+    /**
+     * Replace footnote references and margin notes by markers and remember their content.
+     */
+    protected function collect_notes(): void {
+        $xpath = new \DOMXPath($this->dom);
+        $class = fn($name) => "contains(concat(' ', normalize-space(@class), ' '), ' {$name} ')";
+        // Footnote definitions: li id="fn:1" (Markdown Extra, Word) or id="fn1" (Pandoc).
+        $definitions = [];
+        foreach (iterator_to_array($xpath->query('//li[starts-with(@id, "fn")]')) as $li) {
+            foreach (
+                iterator_to_array($xpath->query('.//a[starts-with(@href, "#fnref") or ' . $class('footnote-backref')
+                    . ' or ' . $class('footnote-back') . ']', $li)) as $back
+            ) {
+                $back->parentNode->removeChild($back);
+            }
+            $definitions[$li->getAttribute('id')] = trim($this->inner_html($li));
+        }
+        foreach (iterator_to_array($xpath->query('//*[' . $class('footnotes') . ']')) as $container) {
+            $container->parentNode->removeChild($container);
+        }
+        foreach (iterator_to_array($xpath->query('//li[starts-with(@id, "fn")]')) as $li) {
+            if ($li->parentNode && $li->parentNode->parentNode) {
+                $li->parentNode->parentNode->removeChild($li->parentNode);
+            }
+        }
+        // References.
+        foreach (iterator_to_array($xpath->query('//a[starts-with(@href, "#fn")]')) as $ref) {
+            $target = substr($ref->getAttribute('href'), 1);
+            if (!isset($definitions[$target])) {
+                continue;
+            }
+            $node = $ref->parentNode instanceof \DOMElement && strtolower($ref->parentNode->tagName) === 'sup'
+                ? $ref->parentNode : $ref;
+            $this->marker($node, $definitions[$target], true);
+        }
+        // Tufte CSS toggles for small screens.
+        foreach (iterator_to_array($xpath->query('//label[' . $class('margin-toggle') . ']')) as $label) {
+            $label->parentNode->removeChild($label);
+        }
+        foreach (iterator_to_array($xpath->query('//*[' . $class('sidenote') . ']')) as $note) {
+            $this->marker($note, $this->inner_html($note), true);
+        }
+        $query = '//aside | //*[' . $class('marginnote') . ' or ' . $class('column-margin') . ' or ' . $class('aside') . ']';
+        foreach (iterator_to_array($xpath->query($query)) as $note) {
+            if ($note->parentNode) {
+                $this->marker($note, $this->inner_html($note), false);
+            }
+        }
+    }
+
+    /**
+     * Replace a node by a note marker.
+     *
+     * Block level notes (aside, div) are moved to the end of the preceding element, so the
+     * note starts next to the text it belongs to.
+     *
+     * @param \DOMNode $node
+     * @param string $html content of the note
+     * @param bool $numbered
+     */
+    protected function marker(\DOMNode $node, string $html, bool $numbered): void {
+        $html = trim($html);
+        if (!$node->parentNode) {
+            return;
+        }
+        if (strip_tags($html, '<img>') === '') {
+            $node->parentNode->removeChild($node);
+            return;
+        }
+        $this->notes[] = ['html' => $html, 'numbered' => $numbered];
+        $marker = $this->dom->createTextNode('[[bbnote:' . (count($this->notes) - 1) . ']]');
+        $tag = strtolower($node->nodeName);
+        if (in_array($tag, ['aside', 'div', 'section', 'figure'])) {
+            $prev = $node->previousSibling;
+            while ($prev && !($prev instanceof \DOMElement)) {
+                $prev = $prev->previousSibling;
+            }
+            if ($prev && in_array(strtolower($prev->tagName), self::TEXT_TAGS)) {
+                $prev->appendChild($marker);
+                $node->parentNode->removeChild($node);
+                return;
+            }
+            $p = $this->dom->createElement('p');
+            $p->appendChild($marker);
+            $node->parentNode->replaceChild($p, $node);
+            return;
+        }
+        $node->parentNode->replaceChild($marker, $node);
+    }
+
+    /**
+     * Inner html of an element.
+     *
+     * @param \DOMNode $node
+     * @return string
+     */
+    protected function inner_html(\DOMNode $node): string {
+        $html = '';
+        foreach ($node->childNodes as $child) {
+            $html .= $this->dom->saveHTML($child);
+        }
+        return $html;
+    }
+
+    /**
+     * Replace the markers in the text blocks by note numbers and attach the notes.
+     *
+     * @param array $blocks
+     * @return array
+     */
+    protected function attach_notes(array $blocks): array {
+        $number = 0;
+        $pending = [];
+        $out = [];
+        foreach ($blocks as $block) {
+            if ($block['type'] !== 'text') {
+                $out[] = $block;
+                continue;
+            }
+            $notes = $pending;
+            $pending = [];
+            $html = preg_replace_callback('/\[\[bbnote:(\d+)\]\]/', function ($m) use (&$notes, &$number) {
+                $note = $this->notes[(int)$m[1]] ?? null;
+                if (!$note) {
+                    return '';
+                }
+                $content = trim(purify_html($note['html']));
+                if (!preg_match('/^<(p|ul|ol|div|table|figure|blockquote)\b/i', $content)) {
+                    $content = '<p>' . $content . '</p>';
+                }
+                if (!$note['numbered']) {
+                    $notes[] = $content;
+                    return '';
+                }
+                $number++;
+                $notes[] = preg_replace('/^<p>/i', '<p><sup>' . $number . '</sup> ', $content, 1);
+                return '<sup>' . $number . '</sup>';
+            }, $block['html']);
+            if (trim(strip_tags($html)) === '') {
+                // A block that consisted of a note only: attach it to the next text.
+                $pending = $notes;
+                continue;
+            }
+            $block['html'] = $html;
+            $block['notes'] = $notes;
+            $out[] = $block;
+        }
+        if ($pending) {
+            for ($i = count($out) - 1; $i >= 0; $i--) {
+                if ($out[$i]['type'] === 'text') {
+                    $out[$i]['notes'] = array_merge($out[$i]['notes'] ?? [], $pending);
+                    break;
+                }
+            }
+        }
+        return $out;
     }
 
     /**

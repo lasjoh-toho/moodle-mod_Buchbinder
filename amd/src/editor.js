@@ -32,7 +32,10 @@ define(['core/ajax', 'core/notification', 'core/str'], function(Ajax, Notificati
         'nocolumnsfound', 'columnsfound', 'audiosaved', 'errorfiletoolarge', 'selectoverlay', 'clipcreated',
         'overlay_textframe', 'overlay_imageframe', 'fontscale', 'textcolumns', 'frameborder', 'nobackground', 'uploadimage',
         'imagefit', 'fit_contain', 'fit_cover', 'alttext', 'caption', 'edittext', 'italic', 'role_h2', 'role_h3',
-        'paragraph', 'bulletlist', 'numberedlist', 'overset', 'imagesaved', 'confirmdeletepage', 'newframetext'
+        'paragraph', 'bulletlist', 'numberedlist', 'overset', 'imagesaved', 'confirmdeletepage', 'newframetext',
+        'errornotimage', 'menu_linknext', 'menu_unlink', 'menu_pinleft', 'menu_pinright', 'menu_unpin', 'blankbefore',
+        'blankafter', 'deletepage', 'fillerpage', 'pagesmenu', 'framestyle', 'framestyle_standard', 'pagestyle_tufte',
+        'framestyle_sidenote'
     ];
 
     var Editor = function(root) {
@@ -47,7 +50,9 @@ define(['core/ajax', 'core/notification', 'core/str'], function(Ajax, Notificati
             this.pages[page.pageid] = page;
         }.bind(this));
         this.currentPage = Object.keys(this.stages)[0];
-        this.panel = root.querySelector('.bb-editor-panel');
+        this.panelFrame = root.querySelector('.bb-editor-panel');
+        this.panel = this.panelFrame ? this.panelFrame.querySelector('.bb-panel-body') || this.panelFrame : null;
+        this.dock = null;
         this.editing = null;
         this.tool = 'select';
         this.overlays = {};
@@ -101,14 +106,16 @@ define(['core/ajax', 'core/notification', 'core/str'], function(Ajax, Notificati
         if (axis === 'x') {
             targets.push(0.5);
         }
-        if (page && page.guides) {
-            var g = page.guides;
+        [page && page.guides, page && page.notes].forEach(function(g) {
+            if (!g) {
+                return;
+            }
             if (axis === 'x') {
                 targets.push(g[0], g[0] + g[2]);
             } else {
                 targets.push(g[1], g[1] + g[3]);
             }
-        }
+        });
         var best = null;
         targets.forEach(function(t) {
             if (Math.abs(t - value) < 0.008 && (best === null || Math.abs(t - value) < Math.abs(best - value))) {
@@ -187,6 +194,8 @@ define(['core/ajax', 'core/notification', 'core/str'], function(Ajax, Notificati
                 content.innerHTML = s.html || '';
             }
             o.el.style.setProperty('--bb-scale', s.fontscale || 1);
+            content.classList.toggle('bb-style-tufte', s.style === 'tufte');
+            content.classList.toggle('bb-style-sidenote', s.style === 'sidenote');
             o.el.style.background = s.bgcolor || '';
             o.el.style.columnCount = s.columns > 1 ? s.columns : '';
             o.el.classList.toggle('bb-frame-border', !!s.border);
@@ -235,6 +244,125 @@ define(['core/ajax', 'core/notification', 'core/str'], function(Ajax, Notificati
             o.el.classList.add('selected');
         }
         this.renderPanel();
+        this.showPanel(o);
+    };
+
+    /**
+     * Show the properties panel only while something is selected, docked opposite to the page worked on.
+     *
+     * @param {Object|null} o selected overlay
+     */
+    Editor.prototype.showPanel = function(o) {
+        var frame = this.panelFrame;
+        if (!frame || !frame.classList.contains('bb-desk-panel')) {
+            return;
+        }
+        frame.hidden = !o;
+        if (!o) {
+            return;
+        }
+        var page = this.pages[o.pageid];
+        var dock = this.dock || (page && page.side === 'right' ? 'left' : 'right');
+        frame.classList.toggle('dock-left', dock === 'left');
+        frame.classList.toggle('dock-right', dock !== 'left');
+    };
+
+    /**
+     * Pages panel: context menu of the thumbnails (chain, pin to a side, blank pages).
+     */
+    Editor.prototype.bindPageMenu = function() {
+        var self = this;
+        var str = this.str;
+        var menu = null;
+        var close = function() {
+            if (menu) {
+                menu.remove();
+                menu = null;
+            }
+        };
+        var go = function(action, pageid) {
+            window.location.href = self.config.actionurl + '&action=' + action + '&pageid=' + pageid;
+        };
+        var open = function(thumb, x, y) {
+            close();
+            var d = thumb.dataset;
+            var items = [];
+            if (d.linked) {
+                items.push(['unlink', str.menu_unlink]);
+            } else if (d.canlink && !d.filler) {
+                items.push(['link', str.menu_linknext]);
+            }
+            if (!d.linked && !d.filler) {
+                items.push(d.pinside === 'left' ? ['unpin', str.menu_unpin] : ['pinleft', str.menu_pinleft]);
+                items.push(d.pinside === 'right' ? ['unpin', str.menu_unpin] : ['pinright', str.menu_pinright]);
+            }
+            items.push(null, ['blankbefore', str.blankbefore], ['blankafter', str.blankafter], null,
+                ['deletepage', str.deletepage]);
+            menu = document.createElement('div');
+            menu.className = 'bb-desk-contextmenu';
+            menu.setAttribute('role', 'menu');
+            menu.setAttribute('aria-label', str.pagesmenu);
+            if (d.filler) {
+                var note = document.createElement('div');
+                note.className = 'bb-desk-contextnote';
+                note.textContent = str.fillerpage;
+                menu.appendChild(note);
+            }
+            items.forEach(function(item) {
+                if (item === null) {
+                    menu.appendChild(document.createElement('hr'));
+                    return;
+                }
+                var b = document.createElement('button');
+                b.type = 'button';
+                b.setAttribute('role', 'menuitem');
+                b.textContent = item[1];
+                b.addEventListener('click', function() {
+                    // eslint-disable-next-line no-alert
+                    if (item[0] === 'deletepage' && !window.confirm(str.confirmdeletepage)) {
+                        return;
+                    }
+                    go(item[0], d.pageid);
+                });
+                menu.appendChild(b);
+            });
+            menu.addEventListener('keydown', function(e) {
+                var buttons = Array.prototype.slice.call(menu.querySelectorAll('button'));
+                var i = buttons.indexOf(document.activeElement);
+                if (e.key === 'Escape') {
+                    close();
+                    thumb.closest('a').focus();
+                } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                    var n = buttons.length;
+                    buttons[(i + (e.key === 'ArrowDown' ? 1 : n - 1)) % n].focus();
+                } else {
+                    return;
+                }
+                e.preventDefault();
+            });
+            document.body.appendChild(menu);
+            var r = menu.getBoundingClientRect();
+            menu.style.left = Math.min(x, window.innerWidth - r.width - 4) + 'px';
+            menu.style.top = Math.min(y, window.innerHeight - r.height - 4) + 'px';
+            menu.querySelector('button').focus();
+        };
+        this.root.querySelectorAll('.bb-desk-spread').forEach(function(spread) {
+            spread.addEventListener('contextmenu', function(e) {
+                var thumb = e.target.closest('.bb-desk-thumb') || spread.querySelector('.bb-desk-thumb');
+                if (!thumb) {
+                    return;
+                }
+                e.preventDefault();
+                var r = thumb.getBoundingClientRect();
+                open(thumb, e.clientX || r.right, e.clientY || r.top);
+            });
+        });
+        document.addEventListener('pointerdown', function(e) {
+            if (menu && !menu.contains(e.target)) {
+                close();
+            }
+        });
+        window.addEventListener('blur', close);
     };
 
     // Persistence.
@@ -424,11 +552,35 @@ define(['core/ajax', 'core/notification', 'core/str'], function(Ajax, Notificati
             });
         });
         var detect = this.root.querySelector('[data-action="detect-columns"]');
+        var hasimage = Object.keys(this.stages).some(function(pageid) {
+            return self.imageOf(pageid) !== null;
+        });
         if (detect) {
+            detect.disabled = !hasimage;
             detect.addEventListener('click', function() {
                 self.detectColumns();
             });
         }
+        var cliptool = this.root.querySelector('[data-tool="clip"]');
+        if (cliptool) {
+            // Clips are cut out of scanned (image) pages only.
+            cliptool.disabled = !hasimage;
+        }
+        var dockbutton = this.root.querySelector('[data-action="dock-panel"]');
+        if (dockbutton) {
+            dockbutton.addEventListener('click', function() {
+                self.dock = self.panelFrame.classList.contains('dock-left') ? 'right' : 'left';
+                self.showPanel(self.selected);
+            });
+        }
+        var closebutton = this.root.querySelector('[data-action="close-panel"]');
+        if (closebutton) {
+            closebutton.addEventListener('click', function() {
+                self.stopEditing();
+                self.select(null);
+            });
+        }
+        this.bindPageMenu();
         var zoom = this.root.querySelector('[data-action="zoom"]');
         if (zoom) {
             zoom.addEventListener('input', function() {
@@ -470,6 +622,9 @@ define(['core/ajax', 'core/notification', 'core/str'], function(Ajax, Notificati
                     self.select(o);
                     drag = {mode: e.target.classList.contains('bb-resize') ? 'resize' : 'move', o: o, start: p,
                         stage: stage, orig: {x: o.x, y: o.y, w: o.w, h: o.h}, moved: false};
+                } else if (self.tool === 'clip' && !self.imageOf(stage.dataset.pageid)) {
+                    Notification.addNotification({message: self.str.errornotimage, type: 'info'});
+                    return;
                 } else if (self.tool !== 'select') {
                     self.stopEditing();
                     var n = {id: -Date.now(), type: self.tool, pageid: stage.dataset.pageid, x: p.x, y: p.y, w: 0, h: 0,
@@ -627,6 +782,9 @@ define(['core/ajax', 'core/notification', 'core/str'], function(Ajax, Notificati
             } else if (e.key === 'Delete') {
                 self.remove(o);
                 e.preventDefault();
+            } else if (e.key === 'Escape') {
+                self.select(null);
+                e.preventDefault();
             }
         });
         this.root.addEventListener('focusin', function(e) {
@@ -774,8 +932,11 @@ define(['core/ajax', 'core/notification', 'core/str'], function(Ajax, Notificati
             var nobg = this.field(body, str.nobackground, this.input('checkbox', !s.bgcolor));
             var bg = this.field(body, str.bgcolor, this.input('color', s.bgcolor || '#ffffff'));
             var border = this.field(body, str.frameborder, this.input('checkbox', s.border));
+            var fstyle = this.field(body, str.framestyle, this.selectInput([['', str.framestyle_standard],
+                ['tufte', str.pagestyle_tufte], ['sidenote', str.framestyle_sidenote]], s.style || ''));
             read.push(function() {
                 self.stopEditing();
+                s.style = fstyle.value;
                 s.fontscale = parseFloat(scale.value) || 1;
                 s.columns = parseInt(cols.value, 10) || 1;
                 s.bgcolor = nobg.checked ? '' : bg.value;

@@ -62,5 +62,21 @@ function xmldb_buchbinder_upgrade($oldversion) {
         upgrade_mod_savepoint(true, 2026092800, 'buchbinder');
     }
 
+    if ($oldversion < 2026092900) {
+        // Intended page sides, automatic blank pages and layout templates.
+        $table = new xmldb_table('buchbinder_page');
+        $fields = [
+            new xmldb_field('pinside', XMLDB_TYPE_CHAR, '5', null, null, null, null, 'spreadside'),
+            new xmldb_field('filler', XMLDB_TYPE_INTEGER, '1', null, XMLDB_NOTNULL, null, '0', 'pinside'),
+            new xmldb_field('pagestyle', XMLDB_TYPE_CHAR, '20', null, null, null, null, 'filler'),
+        ];
+        foreach ($fields as $field) {
+            if (!$dbman->field_exists($table, $field)) {
+                $dbman->add_field($table, $field);
+            }
+        }
+        upgrade_mod_savepoint(true, 2026092900, 'buchbinder');
+    }
+
     return true;
 }

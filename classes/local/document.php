@@ -164,6 +164,9 @@ class document {
             'landscapelock' => 0,
             'spreadid' => null,
             'spreadside' => null,
+            'pinside' => null,
+            'filler' => 0,
+            'pagestyle' => null,
             'timemodified' => time(),
         ], $fields);
         if ($afterpageid) {
@@ -609,6 +612,7 @@ class document {
             $DB->execute('UPDATE {buchbinder_page} SET spreadid = NULL, spreadside = NULL
                            WHERE buchbinderid = ? AND spreadid = ?', [$this->instance->id, $page->spreadid]);
         }
+        $this->rebalance();
     }
 
     /**
@@ -618,16 +622,112 @@ class document {
      */
     public function link_spread(int $pageid): void {
         global $DB;
-        $pages = array_values($this->get_pages());
+        $pages = array_values(array_filter($this->get_pages(), fn($p) => !$p->filler));
         foreach ($pages as $i => $page) {
             if ($page->id == $pageid && isset($pages[$i + 1]) && !$page->spreadid && !$pages[$i + 1]->spreadid) {
+                // Pins do not apply to double pages: the chain decides the sides.
                 $DB->update_record('buchbinder_page', (object)['id' => $page->id, 'spreadid' => $page->id,
-                    'spreadside' => 'left']);
+                    'spreadside' => 'left', 'pinside' => null]);
                 $DB->update_record('buchbinder_page', (object)['id' => $pages[$i + 1]->id, 'spreadid' => $page->id,
-                    'spreadside' => 'right']);
+                    'spreadside' => 'right', 'pinside' => null]);
+                // Automatic blank pages between the halves are no longer needed.
+                $this->rebalance();
                 return;
             }
         }
+    }
+
+    /**
+     * Pin a page to a left or right page of the booklet.
+     *
+     * Pinned pages keep their side when pages before them are added, removed or moved: the
+     * document inserts or removes automatic blank pages instead.
+     *
+     * @param int $pageid
+     * @param string|null $side booklet::LEFT, booklet::RIGHT or null to unpin
+     */
+    public function set_pinside(int $pageid, ?string $side): void {
+        global $DB;
+        $page = $this->get_page($pageid);
+        if ($side !== null && !in_array($side, [booklet::LEFT, booklet::RIGHT], true)) {
+            throw new \invalid_parameter_exception('Unknown side');
+        }
+        if ($page->spreadid && $side !== null) {
+            // Double pages are aligned by their chain.
+            $side = null;
+        }
+        $DB->set_field('buchbinder_page', 'pinside', $side, ['id' => $page->id]);
+        $this->rebalance();
+    }
+
+    /**
+     * Side a page must lie on, if any.
+     *
+     * @param stdClass $page
+     * @return string|null
+     */
+    public static function required_side(stdClass $page): ?string {
+        if ($page->spreadid && in_array($page->spreadside, [booklet::LEFT, booklet::RIGHT], true)) {
+            return $page->spreadside;
+        }
+        return in_array($page->pinside ?? null, [booklet::LEFT, booklet::RIGHT], true) ? $page->pinside : null;
+    }
+
+    /**
+     * Insert or remove automatic blank pages so that pinned pages and double pages lie on their side.
+     *
+     * Automatic blank pages (filler) are only removed while they are empty; as soon as something is
+     * placed on them they become ordinary pages.
+     *
+     * @return int change of the page count
+     */
+    public function rebalance(): int {
+        global $DB;
+        $pages = array_values($this->get_pages());
+        $used = [];
+        if ($pages) {
+            [$insql, $params] = $DB->get_in_or_equal(array_map(fn($p) => $p->id, $pages));
+            $used = array_flip($DB->get_fieldset_select('buchbinder_overlay', 'DISTINCT pageid', "pageid $insql", $params));
+        }
+        $pool = [];
+        $keep = [];
+        foreach ($pages as $page) {
+            if ($page->filler && $page->pagetype === 'canvas' && !isset($used[$page->id])) {
+                $pool[] = $page;
+            } else {
+                $keep[] = $page;
+            }
+        }
+        $firstright = $this->first_page_right();
+        $order = [];
+        $position = 1;
+        foreach ($keep as $page) {
+            $required = self::required_side($page);
+            if ($required !== null && booklet::side($position, $firstright) !== $required) {
+                $order[] = array_shift($pool) ?? null;
+                $position++;
+            }
+            $order[] = $page;
+            $position++;
+        }
+        $before = count($pages);
+        $transaction = $DB->start_delegated_transaction();
+        foreach ($pool as $unused) {
+            $DB->delete_records('buchbinder_page', ['id' => $unused->id]);
+        }
+        $sortorder = 1;
+        foreach ($order as $page) {
+            if ($page === null) {
+                $page = $this->insert_page(['pagetype' => 'canvas', 'width' => booklet::CANVAS_WIDTH,
+                    'height' => booklet::CANVAS_HEIGHT, 'filler' => 1, 'sortorder' => $sortorder]);
+                $DB->set_field('buchbinder_page', 'sortorder', $sortorder, ['id' => $page->id]);
+            } else if ((int)$page->sortorder !== $sortorder) {
+                $DB->set_field('buchbinder_page', 'sortorder', $sortorder, ['id' => $page->id]);
+            }
+            $sortorder++;
+        }
+        $transaction->allow_commit();
+        return count($order) - $before;
     }
 
     /**
@@ -643,6 +743,10 @@ class document {
         $units = [];
         $current = null;
         foreach ($this->get_pages() as $page) {
+            if ($page->filler && $page->id != $pageid) {
+                // Automatic blank pages are recreated by rebalance().
+                continue;
+            }
             $key = $page->spreadid ? 's' . $page->spreadid : 'p' . $page->id;
             if (!isset($units[$key])) {
                 $units[$key] = [];
@@ -670,14 +774,16 @@ class document {
             }
         }
         $transaction->allow_commit();
+        $this->rebalance();
     }
 
     /**
      * Delete a page including overlays and files.
      *
      * @param int $pageid
+     * @param bool $rebalance restore the sides of pinned pages and double pages afterwards
      */
-    public function delete_page(int $pageid): void {
+    public function delete_page(int $pageid, bool $rebalance = true): void {
         global $DB;
         $page = $this->get_page($pageid);
         $this->delete_overlays_of_page($page->id);
@@ -688,6 +794,9 @@ class document {
         $DB->delete_records('buchbinder_page', ['id' => $page->id]);
         if ($page->spreadid) {
             $this->unlink_spread_by_id((int)$page->spreadid);
+        }
+        if ($rebalance) {
+            $this->rebalance();
         }
     }
 
@@ -754,84 +863,68 @@ class document {
     /**
      * Insert a blank page before or after a page.
      *
+     * Double pages are never torn apart: the page goes before the left or after the right half.
+     *
      * @param int $pageid
      * @param bool $before
      * @return stdClass new page
      */
     public function insert_blank_page(int $pageid, bool $before = false): stdClass {
+        global $DB;
         $pages = array_values($this->get_pages());
         $index = array_search($pageid, array_map(fn($p) => (int)$p->id, $pages));
         if ($index === false) {
             throw new \invalid_parameter_exception('Unknown page');
         }
-        if (!$before) {
-            return $this->add_canvas_page($pageid);
+        $page = $pages[$index];
+        if ($page->spreadid) {
+            foreach ($pages as $i => $other) {
+                if ($other->spreadid == $page->spreadid && $other->spreadside === ($before ? 'left' : 'right')) {
+                    $index = $i;
+                }
+            }
         }
-        if ($index === 0) {
+        if (!$before) {
+            $new = $this->add_canvas_page((int)$pages[$index]->id);
+        } else if ($index === 0) {
             // Insert at the very beginning.
-            global $DB;
             $DB->execute(
                 'UPDATE {buchbinder_page} SET sortorder = sortorder + 1 WHERE buchbinderid = ?',
                 [$this->instance->id]
             );
-            $page = $this->insert_page(['pagetype' => 'canvas', 'width' => booklet::CANVAS_WIDTH,
+            $new = $this->insert_page(['pagetype' => 'canvas', 'width' => booklet::CANVAS_WIDTH,
                 'height' => booklet::CANVAS_HEIGHT, 'sortorder' => 0]);
-            $DB->set_field('buchbinder_page', 'sortorder', $pages[0]->sortorder, ['id' => $page->id]);
-            return $page;
+            $DB->set_field('buchbinder_page', 'sortorder', $pages[0]->sortorder, ['id' => $new->id]);
+        } else {
+            $new = $this->add_canvas_page((int)$pages[$index - 1]->id);
         }
-        return $this->add_canvas_page((int)$pages[$index - 1]->id);
+        $this->rebalance();
+        return $new;
     }
 
     /**
-     * Double pages whose halves do not lie on a left and a right page.
+     * Pages that do not lie on their side (pinned pages, torn double pages).
      *
-     * @return array[] ['spreadid' => int, 'leftpageid' => int, 'position' => int]
+     * After rebalance() this is normally empty.
+     *
+     * @return array[] ['pageid' => int, 'position' => int, 'side' => string required side]
      */
     public function layout_issues(): array {
         $issues = [];
         $pages = array_values($this->get_pages());
         foreach ($pages as $i => $page) {
-            if (!$page->spreadid || $page->spreadside !== 'left') {
-                continue;
-            }
+            $required = self::required_side($page);
             $position = $i + 1;
-            $next = $pages[$i + 1] ?? null;
-            $paired = $next && $next->spreadid == $page->spreadid;
-            if ($this->side_at($position) !== booklet::LEFT || !$paired) {
-                $issues[] = ['spreadid' => (int)$page->spreadid, 'leftpageid' => (int)$page->id, 'position' => $position];
+            $torn = false;
+            if ($page->spreadid && $page->spreadside === booklet::LEFT) {
+                $next = $pages[$i + 1] ?? null;
+                $torn = !$next || $next->spreadid != $page->spreadid;
+            }
+            if ($torn || ($required !== null && $this->side_at($position) !== $required)) {
+                $issues[] = ['pageid' => (int)$page->id, 'position' => $position, 'side' => (string)$required];
             }
         }
         return $issues;
-    }
-
-    /**
-     * Fix a misaligned double page by inserting a blank page before its left half.
-     *
-     * @param int $leftpageid
-     * @return bool whether a page was inserted
-     */
-    public function align_spread(int $leftpageid): bool {
-        $positions = $this->get_positions();
-        if (!isset($positions[$leftpageid]) || $this->side_at($positions[$leftpageid]) === booklet::LEFT) {
-            return false;
-        }
-        $this->insert_blank_page($leftpageid, true);
-        return true;
-    }
-
-    /**
-     * Make sure the next appended page will be on the given side, adding a blank page if needed.
-     *
-     * @param string $side
-     * @return bool whether a blank page was added
-     */
-    public function pad_to_side(string $side): bool {
-        $count = count($this->get_pages());
-        if ($this->side_at($count + 1) === $side) {
-            return false;
-        }
-        $this->add_canvas_page();
-        return true;
     }
 
     // Frames.
@@ -982,6 +1075,10 @@ class document {
         } else {
             $overlay = (object)['pageid' => $page->id, 'overlaytype' => $type];
             $settings['filename'] = '';
+        }
+        if ($page->filler) {
+            // Content turns an automatic blank page into an ordinary page.
+            $DB->set_field('buchbinder_page', 'filler', 0, ['id' => $page->id]);
         }
         $overlay->settings = overlay_types::clean($type, $settings);
         $overlay->data = json_encode($overlay->settings);
@@ -1173,7 +1270,7 @@ class document {
             ) as $pageid
         ) {
             if ($deletepages) {
-                $this->delete_page((int)$pageid);
+                $this->delete_page((int)$pageid, false);
                 $count++;
             } else {
                 $DB->set_field('buchbinder_page', 'sourceid', null, ['id' => $pageid]);
@@ -1181,6 +1278,9 @@ class document {
         }
         get_file_storage()->delete_area_files($this->context->id, 'mod_buchbinder', 'source', $source->id);
         $DB->delete_records('buchbinder_source', ['id' => $source->id]);
+        if ($count) {
+            $this->rebalance();
+        }
         return $count;
     }
 
@@ -1292,6 +1392,7 @@ class document {
         }
         $DB->update_record('buchbinder', (object)['id' => $this->instance->id, 'masterid' => $master->get_instance()->id,
             'masterrange' => $range, 'timemodified' => time()]);
+        $this->rebalance();
         return $count;
     }
 

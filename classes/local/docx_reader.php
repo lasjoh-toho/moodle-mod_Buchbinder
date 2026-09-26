@@ -39,6 +39,9 @@ class docx_reader {
     /** @var array relationship id => target of the document being read */
     protected static $rels = [];
 
+    /** @var int[] footnote id => display number, in the order of the references */
+    protected static $footnoterefs = [];
+
     /**
      * Convert a docx file into html pages (split at manual page breaks).
      *
@@ -74,7 +77,9 @@ class docx_reader {
             throw new \moodle_exception('errorimportformat', 'mod_buchbinder');
         }
         $xml = $zip->getFromName('word/document.xml');
+        $footnotesxml = $zip->getFromName('word/footnotes.xml');
         self::$rels = [];
+        self::$footnoterefs = [];
         $media = [];
         $relsxml = $zip->getFromName('word/_rels/document.xml.rels');
         if ($relsxml !== false) {
@@ -154,10 +159,51 @@ class docx_reader {
         if ($inlist) {
             $html .= '</ul>';
         }
+        if (self::$footnoterefs && $footnotesxml !== false) {
+            // Footnotes in the format of Markdown Extra: a list at the end, see blocks::extract_notes().
+            $html .= self::footnotes($footnotesxml);
+        }
         if (trim($html) !== '') {
             $pages[] = $html;
         }
         return ['pages' => $pages, 'media' => $media];
+    }
+
+    /**
+     * Html list of the referenced footnotes.
+     *
+     * @param string $xml content of word/footnotes.xml
+     * @return string
+     */
+    protected static function footnotes(string $xml): string {
+        $dom = new \DOMDocument();
+        if (!@$dom->loadXML($xml, LIBXML_NONET)) {
+            return '';
+        }
+        $xpath = new \DOMXPath($dom);
+        $xpath->registerNamespace('w', self::NS);
+        $xpath->registerNamespace('a', self::NS_A);
+        $xpath->registerNamespace('r', self::NS_R);
+        $notes = [];
+        foreach ($xpath->query('/w:footnotes/w:footnote') as $note) {
+            $id = $note->getAttributeNS(self::NS, 'id');
+            if (!isset(self::$footnoterefs[$id])) {
+                continue;
+            }
+            $paragraphs = [];
+            foreach ($xpath->query('w:p', $note) as $p) {
+                $text = trim(self::runs($xpath, $p));
+                if ($text !== '') {
+                    $paragraphs[] = '<p>' . $text . '</p>';
+                }
+            }
+            $notes[self::$footnoterefs[$id]] = '<li id="fn:' . self::$footnoterefs[$id] . '">' . implode('', $paragraphs) . '</li>';
+        }
+        if (!$notes) {
+            return '';
+        }
+        ksort($notes);
+        return '<div class="footnotes"><hr><ol>' . implode('', $notes) . '</ol></div>';
     }
 
     /**
@@ -183,6 +229,13 @@ class docx_reader {
                     $text .= ' ';
                 } else if ($child->localName === 'br' && $child->getAttributeNS(self::NS, 'type') !== 'page') {
                     $text .= '<br>';
+                } else if ($child->localName === 'footnoteReference') {
+                    $id = $child->getAttributeNS(self::NS, 'id');
+                    if (!isset(self::$footnoterefs[$id])) {
+                        self::$footnoterefs[$id] = count(self::$footnoterefs) + 1;
+                    }
+                    $number = self::$footnoterefs[$id];
+                    $text .= '<sup><a href="#fn:' . $number . '" class="footnote-ref">' . $number . '</a></sup>';
                 }
             }
             if ($text === '') {

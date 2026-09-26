@@ -69,27 +69,57 @@ class flow {
     /** @var bool start a new page before the next content */
     protected $breakpending = false;
 
+    /** @var string page style (booklet::STYLE_*) */
+    protected $style;
+
+    /** @var float[]|null note column of the current page (Tufte style) */
+    protected $notearea = null;
+
+    /** @var float bottom of the last note in the note column */
+    protected $notey = 0.0;
+
+    /** @var string[] notes that did not fit on the previous page */
+    protected $pendingnotes = [];
+
+    /** @var float Average character width of the serif typeface of the Tufte style relative to the font size. */
+    const CHAR_WIDTH_SERIF = 0.42;
+
+    /** @var float factor for widths in estimates: more characters per line in narrow typefaces */
+    protected $textfactor = 1.0;
+
+    /** @var float Font scale of notes and margin captions. */
+    const NOTE_SCALE = 0.8;
+
+    /** @var int Images up to this width (px) become margin figures in the Tufte style. */
+    const MARGIN_FIGURE_MAX_WIDTH = 450;
+
     /**
      * Constructor.
      *
      * @param document $document
      * @param int|null $sourceid
+     * @param string $style page style (booklet::STYLE_STANDARD or booklet::STYLE_TUFTE)
      */
-    public function __construct(document $document, ?int $sourceid) {
+    public function __construct(document $document, ?int $sourceid, string $style = booklet::STYLE_STANDARD) {
         $this->document = $document;
         $this->sourceid = $sourceid;
+        $this->style = in_array($style, booklet::styles(), true) ? $style : booklet::STYLE_STANDARD;
+        if ($this->style === booklet::STYLE_TUFTE) {
+            $this->textfactor = self::CHAR_WIDTH / self::CHAR_WIDTH_SERIF;
+        }
     }
 
     /**
      * Place blocks on new pages at the end of the document.
      *
      * @param array $blocks see blocks
-     * @param bool $startright start on a right page (adds a blank page if needed)
+     * @param bool $startright start on a right page (pins the first page, adds a blank page if needed)
      * @return \stdClass[] created pages (without blank padding pages)
      */
     public function run(array $blocks, bool $startright = false): array {
-        if ($startright) {
-            $this->document->pad_to_side(booklet::RIGHT);
+        if ($startright && $this->document->side_at(count($this->document->get_pages()) + 1) !== booklet::RIGHT) {
+            // Frames are placed in the mirrored type area, so the side must be known in advance.
+            $this->document->add_canvas_page(null, ['filler' => 1]);
         }
         foreach ($blocks as $block) {
             if ($block['type'] === 'pagebreak') {
@@ -97,10 +127,17 @@ class flow {
             } else if ($block['type'] === 'image') {
                 $this->place_image($block);
             } else {
-                $this->place_text($block['tag'], $block['html']);
+                $this->place_text($block['tag'], $block['html'], $block['notes'] ?? []);
             }
         }
         $this->flush();
+        if ($this->pendingnotes && $this->page) {
+            // Notes of the last lines: a further page only for them.
+            $this->new_page();
+        }
+        if ($startright && $this->pages) {
+            $this->document->set_pinside((int)$this->pages[0]->id, booklet::RIGHT);
+        }
         return $this->pages;
     }
 
@@ -174,12 +211,53 @@ class flow {
      */
     protected function new_page(): void {
         $this->flush();
-        $this->page = $this->document->add_canvas_page(null, ['sourceid' => $this->sourceid]);
+        $this->page = $this->document->add_canvas_page(null, ['sourceid' => $this->sourceid,
+            'pagestyle' => $this->style === booklet::STYLE_STANDARD ? null : $this->style]);
         $this->pages[] = $this->page;
         $position = count($this->document->get_pages());
-        $this->area = booklet::type_area($this->document->side_at($position));
+        $side = $this->document->side_at($position);
+        $this->area = booklet::type_area($side, $this->style);
         $this->y = $this->area[1];
         $this->breakpending = false;
+        if ($this->style === booklet::STYLE_TUFTE) {
+            $this->notearea = booklet::note_area($side);
+            $this->notey = $this->notearea[1];
+            $pending = $this->pendingnotes;
+            $this->pendingnotes = [];
+            $this->place_notes($pending);
+        }
+    }
+
+    /**
+     * Place notes in the note column next to the current line.
+     *
+     * @param string[] $notes html
+     */
+    protected function place_notes(array $notes): void {
+        if (!$notes) {
+            return;
+        }
+        if ($this->notearea === null) {
+            return;
+        }
+        $bottom = $this->notearea[1] + $this->notearea[3];
+        foreach ($notes as $i => $html) {
+            $height = self::estimate('p', $html, $this->notearea[2] / self::NOTE_SCALE * $this->textfactor) * self::NOTE_SCALE;
+            $top = max($this->y, $this->notey);
+            if ($top + $height > $bottom + 1e-9 && $top > $this->notearea[1] + 1e-9) {
+                // Continue in the note column of the next page.
+                $this->pendingnotes = array_merge($this->pendingnotes, array_slice($notes, $i));
+                return;
+            }
+            $this->document->save_overlay(
+                (int)$this->page->id,
+                0,
+                overlay_types::TEXTFRAME,
+                [$this->notearea[0], $top, $this->notearea[2], min($height, $bottom - $top)],
+                ['html' => $html, 'fontscale' => self::NOTE_SCALE, 'style' => 'sidenote']
+            );
+            $this->notey = $top + $height + self::GAP_MM / 2 / booklet::PAGE_HEIGHT_MM;
+        }
     }
 
     /**
@@ -209,15 +287,18 @@ class flow {
      *
      * @param string $tag
      * @param string $html
+     * @param string[] $notes notes referenced in the block (Tufte style: placed next to it)
      */
-    protected function place_text(string $tag, string $html): void {
+    protected function place_text(string $tag, string $html, array $notes = []): void {
         $guard = 0;
         while ($html !== '' && $guard++ < 200) {
-            $width = $this->area[2] ?? booklet::type_area(booklet::RIGHT)[2];
+            // Width for the estimates (the frame gets the width of the type area).
+            $width = ($this->area[2] ?? booklet::type_area(booklet::RIGHT, $this->style)[2]) * $this->textfactor;
             $height = self::estimate($tag, $html, $width);
             // Keep headings with at least three lines of the following text.
             $needed = isset(self::HEADING_SCALE[$tag]) ? $height + 3 * self::line_height() : $height;
             if ($this->page !== null && !$this->breakpending && $this->y + $needed <= $this->bottom() + 1e-9) {
+                $this->place_notes($notes);
                 $this->add_to_chunk($html, $height);
                 return;
             }
@@ -229,12 +310,15 @@ class flow {
             if (!isset(self::HEADING_SCALE[$tag]) && $free >= 3 * self::line_height()) {
                 [$first, $rest] = self::split($tag, $html, $free, $width);
                 if ($first !== '') {
+                    $this->place_notes($notes);
+                    $notes = [];
                     $this->add_to_chunk($first, self::estimate($tag, $first, $width));
                     $html = $rest;
                 }
             }
             if ($this->y <= $this->area[1] + 1e-9) {
                 // Even an empty page is too small: place it anyway, the frame can be adjusted in the studio.
+                $this->place_notes($notes);
                 $this->add_to_chunk($html, min($height, $this->area[3]));
                 return;
             }
@@ -270,7 +354,7 @@ class flow {
             0,
             overlay_types::TEXTFRAME,
             [$this->area[0], $this->chunktop, $this->area[2], max($height, self::line_height())],
-            ['html' => implode("\n", $this->chunk)]
+            ['html' => implode("\n", $this->chunk), 'style' => $this->style === booklet::STYLE_TUFTE ? 'tufte' : '']
         );
         $this->chunk = [];
         $this->y += self::GAP_MM / booklet::PAGE_HEIGHT_MM;
@@ -282,7 +366,11 @@ class flow {
      * @param array $block
      */
     protected function place_image(array $block): void {
-        $area = $this->area ?? booklet::type_area(booklet::RIGHT);
+        if ($this->style === booklet::STYLE_TUFTE && $block['width'] <= self::MARGIN_FIGURE_MAX_WIDTH) {
+            $this->place_margin_figure($block);
+            return;
+        }
+        $area = $this->area ?? booklet::type_area(booklet::RIGHT, $this->style);
         $aspect = booklet::PAGE_WIDTH_MM / booklet::PAGE_HEIGHT_MM;
         // Natural size at 150 dpi, at most the width of the type area.
         $width = min($area[2], $block['width'] / booklet::CANVAS_WIDTH);
@@ -306,6 +394,38 @@ class flow {
         $this->y += $height + self::GAP_MM / booklet::PAGE_HEIGHT_MM;
         if ($block['caption'] !== '') {
             $this->place_text('p', '<p class="bb-caption"><em>' . s($block['caption']) . '</em></p>');
+        }
+    }
+
+    /**
+     * Place a small image in the note column next to the current line (margin figure).
+     *
+     * @param array $block
+     */
+    protected function place_margin_figure(array $block): void {
+        if ($this->page === null || $this->breakpending) {
+            $this->new_page();
+        }
+        $aspect = booklet::PAGE_WIDTH_MM / booklet::PAGE_HEIGHT_MM;
+        $width = min($this->notearea[2], $block['width'] / booklet::CANVAS_WIDTH);
+        $height = $width * $block['height'] / max(1, $block['width']) * $aspect;
+        $bottom = $this->notearea[1] + $this->notearea[3];
+        $top = max($this->y, $this->notey);
+        if ($top + $height > $bottom) {
+            $this->new_page();
+            $top = max($this->y, $this->notey);
+        }
+        $frame = $this->document->save_overlay(
+            (int)$this->page->id,
+            0,
+            overlay_types::IMAGEFRAME,
+            [$this->notearea[0], $top, $width, min($height, $bottom - $top)],
+            ['alt' => $block['alt'], 'caption' => $block['caption']]
+        );
+        $this->document->save_frame_image((int)$frame->id, $block['filename'], $block['data']);
+        $this->notey = $top + $height + self::GAP_MM / 2 / booklet::PAGE_HEIGHT_MM;
+        if ($block['caption'] !== '') {
+            $this->place_notes(['<p><em>' . s($block['caption']) . '</em></p>']);
         }
     }
 

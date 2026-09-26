@@ -86,7 +86,11 @@ class eco_print {
         $this->pdf->SetTitle($this->document->get_instance()->name);
         $this->pdf->SetCreator('Moodle mod_buchbinder');
 
-        foreach (imposition::sides($layout, count($pages)) as $side) {
+        // Keep double pages: the side of the first printed page decides the slot it goes into.
+        $positions = $this->document->get_positions();
+        $first = $pages ? ($positions[$pages[0]->id] ?? 1) : 1;
+        $startright = $this->document->side_at($first) === booklet::RIGHT;
+        foreach (imposition::sides($layout, count($pages), $startright) as $side) {
             $slots = $this->slot_boxes($layout, $side, $pages);
             foreach ($side as $i => $position) {
                 if ($position === null) {
@@ -252,9 +256,15 @@ class eco_print {
             }
             $this->pdf->SetTextColor(0, 0, 0);
             // 11 pt body text on a 210 mm page, scaled to the printed page size.
-            $this->pdf->SetFont('freesans', '', max(4, 11 * $pagewidth / booklet::PAGE_WIDTH_MM * ($s['fontscale'] ?? 1)));
+            // The Tufte style is set in a serif typeface with italic headings.
+            $serif = in_array($s['style'] ?? '', ['tufte', 'sidenote'], true);
+            $size = max(4, 11 * $pagewidth / booklet::PAGE_WIDTH_MM * ($s['fontscale'] ?? 1));
+            $this->pdf->SetFont($serif ? 'freeserif' : 'freesans', '', $size);
             $this->pdf->setHtmlVSpace(['p' => [['h' => 0, 'n' => 0], ['h' => 1, 'n' => 0.4]]]);
             $html = format_text($s['html'] ?? '', FORMAT_HTML, ['context' => $this->document->get_context(), 'filter' => false]);
+            if ($serif) {
+                $html = preg_replace('#<(h[1-6])\b([^>]*)>(.*?)</\1>#si', '<$1$2><i style="font-weight:normal">$3</i></$1>', $html);
+            }
             // TCPDF ignores the CSS of the viewer: give tables visible cell borders.
             $html = preg_replace('/<table\b/i', '<table border="1" cellpadding="3"', $html);
             $this->pdf->writeHTMLCell($w, $h, $x, $y, $html, 0, 0, false, true, '', true);

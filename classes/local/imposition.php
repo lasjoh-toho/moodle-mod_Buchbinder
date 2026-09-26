@@ -66,25 +66,37 @@ class imposition {
     /**
      * Compute the sheet sides for a layout.
      *
+     * Several pages on one sheet side are placed as double pages: left pages on the left, right
+     * pages on the right, so the outer margins (and the notes of the Tufte style) lie outside.
+     *
      * @param string $layout
      * @param int $count number of pages
+     * @param bool $startright whether the first page is a right page of the booklet
      * @return array[] list of sides, each a list of page positions (1-based) or null
      */
-    public static function sides(string $layout, int $count): array {
+    public static function sides(string $layout, int $count, bool $startright = true): array {
         if ($count < 1) {
             return [];
         }
+        $positions = range(1, $count);
         if ($layout === self::LAYOUT_BOOKLET) {
-            return self::booklet($count);
+            // The first page of a booklet is a right page (front cover).
+            if (!$startright) {
+                array_unshift($positions, null);
+            }
+            return array_map(
+                fn($side) => array_map(fn($p) => $p === null ? null : $positions[$p - 1], $side),
+                self::booklet(count($positions))
+            );
         }
         $slots = self::slots($layout);
+        if ($slots > 1 && $startright) {
+            // Page 1 goes into the right slot, like the first page of a book.
+            array_unshift($positions, null);
+        }
         $sides = [];
-        for ($i = 1; $i <= $count; $i += $slots) {
-            $side = [];
-            for ($j = 0; $j < $slots; $j++) {
-                $side[] = ($i + $j <= $count) ? $i + $j : null;
-            }
-            $sides[] = $side;
+        foreach (array_chunk($positions, $slots) as $chunk) {
+            $sides[] = array_pad($chunk, $slots, null);
         }
         return $sides;
     }

@@ -16,6 +16,7 @@
 
 namespace mod_buchbinder;
 
+use mod_buchbinder\local\booklet;
 use mod_buchbinder\local\document;
 use mod_buchbinder\local\importer;
 
@@ -55,11 +56,42 @@ final class document_test extends \advanced_testcase {
         $document = $this->create_document(4);
         [$a, $b, $c, $d] = array_keys($document->get_pages());
         $document->link_spread($b);
+        $ordinary = fn() => array_keys(array_filter($document->get_pages(), fn($p) => !$p->filler));
         $document->move_page($c, -1);
-        // Page c belongs to the double page b|c, so the whole double page moves before a.
-        $this->assertSame([$b, $c, $a, $d], array_keys($document->get_pages()));
+        // Page c belongs to the double page b|c, so the whole double page moves before a. It must start on a
+        // left page, so an automatic blank page becomes page 1.
+        $this->assertSame([$b, $c, $a, $d], $ordinary());
+        $this->assertCount(5, $document->get_pages());
+        $this->assertEquals(1, array_values($document->get_pages())[0]->filler);
         $document->move_page($d, -1);
-        $this->assertSame([$b, $c, $d, $a], array_keys($document->get_pages()));
+        $this->assertSame([$b, $c, $d, $a], $ordinary());
+    }
+
+    public function test_pinned_pages_keep_their_side(): void {
+        $this->resetAfterTest();
+        $document = $this->create_document(3);
+        [$a, $b, $c] = array_keys($document->get_pages());
+        // Page c (position 3) is a right page; pin it there.
+        $document->set_pinside($c, booklet::RIGHT);
+        $this->assertCount(3, $document->get_pages());
+        // Deleting page a would move c to a left page: an automatic blank page keeps it on the right.
+        $document->delete_page($a);
+        $pages = array_values($document->get_pages());
+        $this->assertCount(3, $pages);
+        $this->assertEquals(1, $pages[1]->filler);
+        $this->assertSame(3, $document->get_positions()[$c]);
+        // Inserting a page before b makes the blank page superfluous: it disappears.
+        $document->insert_blank_page($b, true);
+        $this->assertCount(3, $document->get_pages());
+        $this->assertSame(3, $document->get_positions()[$c]);
+        $this->assertSame([], array_filter($document->get_pages(), fn($p) => $p->filler));
+        // Content on an automatic blank page makes it an ordinary page.
+        $document->set_pinside($c, booklet::LEFT);
+        $filler = array_values(array_filter($document->get_pages(), fn($p) => $p->filler))[0];
+        $document->save_overlay((int)$filler->id, 0, 'textframe', [0.1, 0.1, 0.5, 0.2], ['html' => '<p>x</p>']);
+        $document->set_pinside($c, null);
+        $this->assertCount(4, $document->get_pages());
+        $this->assertSame([], $document->layout_issues());
     }
 
     public function test_overlays(): void {
