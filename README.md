@@ -176,6 +176,10 @@ anlegen und veröffentlichen. Der Workflow hängt das ZIP nach wenigen Minuten a
 (Name, Text und Vorabversion-Häkchen bleiben so, wie sie eingegeben wurden). Tags mit `v` müssen
 zur Version in `version.php` passen, andere Tags wie `latest` werden ohne Prüfung akzeptiert.
 
+**Automatisch nach jedem Push:** Ist die CI grün und gibt es zur Version in `version.php` schon ein
+Release ohne ZIP, wird das ZIP angehängt. Auf dem Hauptbranch wird ein fehlendes Release neu
+erstellt – Versionsnummer erhöhen (`release.sh bump`) und mergen genügt.
+
 **Optional: moodle.org.** Ist das Plugin im Moodle-Plugin-Verzeichnis registriert, lädt der
 Workflow jede Version automatisch hoch, sobald das Repository-Secret `MOODLE_ORG_TOKEN` gesetzt ist
 (Token unter moodle.org → Profil → Sicherheitsschlüssel, Dienst „Plugins directory API“).
