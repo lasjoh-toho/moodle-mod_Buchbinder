@@ -5,6 +5,8 @@ neuen Version (siehe README, „Release erstellen“).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-26
+
 - Release-Workflow: GitHub Actions prüft jeden Push (Moodle 4.4, 4.5 und 5.0) und veröffentlicht
   bei einem Versions-Tag ein installierbares ZIP als GitHub-Release
 - JavaScript wird als minifizierter Build ausgeliefert
