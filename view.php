@@ -58,7 +58,7 @@ foreach ($pages as $page) {
         'number' => $page->pagenumber,
         'isimage' => $page->pagetype === 'image',
         'imageurl' => $page->pagetype === 'image' ? $document->page_image_url($page)->out(false) : '',
-        'html' => $page->pagetype === 'html' ? $document->page_html($page) : '',
+        'html' => $page->pagetype !== 'image' ? $document->page_html($page) : '',
         'ratio' => $page->width ? round($page->height / $page->width * 100, 4) : 141.4286,
         'landscape' => $page->width > $page->height,
         'spreadside' => $page->spreadside,
@@ -107,7 +107,7 @@ foreach ($pages as $page) {
     foreach ($reflow as $block) {
         $item['reflow'][] = ['text' => $block['text'], 'is' . $block['role'] => true];
     }
-    $item['hasreflow'] = !empty($item['reflow']) || $page->pagetype === 'html';
+    $item['hasreflow'] = !empty($item['reflow']) || $page->pagetype !== 'image';
     $hasreflow = $hasreflow || !empty($item['reflow']);
     if ($page->sourceid && isset($sources[$page->sourceid]) && document::has_citation($sources[$page->sourceid])) {
         $item['citation'] = document::citation($sources[$page->sourceid]);

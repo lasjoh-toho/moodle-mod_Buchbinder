@@ -61,6 +61,7 @@ class backup_buchbinder_activity_structure_step extends backup_activity_structur
         $overlay->set_source_table('buchbinder_overlay', ['pageid' => backup::VAR_PARENTID], 'sortorder ASC');
 
         $buchbinder->annotate_files('mod_buchbinder', 'intro', null);
+        $buchbinder->annotate_files('mod_buchbinder', 'clips', null);
         $source->annotate_files('mod_buchbinder', 'source', 'id');
         $page->annotate_files('mod_buchbinder', 'page', 'id');
         $page->annotate_files('mod_buchbinder', 'pagecontent', 'id');

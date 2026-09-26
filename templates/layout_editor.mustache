@@ -1,0 +1,59 @@
+{{!
+    This file is part of Moodle - https://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Moodle is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
+}}
+{{!
+    @template mod_buchbinder/layout_editor
+
+    Editor of a composed page: source form, syntax help and clips.
+
+    Example context (json):
+    {"form": "<form></form>", "preview": "", "hasclips": true, "canvasurl": "#",
+     "cheatsheet": "::: {.columns}", "clips": [{"filename": "ausschnitt-1.png", "url": "#", "markdown": "![](ausschnitt-1.png)", "deleteurl": "#"}]}
+}}
+<div class="bb-layout-editor">
+    <div class="bb-layout-main">
+        {{{form}}}
+        {{{preview}}}
+    </div>
+    <aside class="bb-layout-side">
+        <div class="card mb-3">
+            <div class="card-body p-2">
+                <h5>{{#str}}layoutsyntax, mod_buchbinder{{/str}}</h5>
+                <pre class="bb-layout-cheatsheet small mb-0">{{cheatsheet}}</pre>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-body p-2">
+                <h5>{{#str}}clips, mod_buchbinder{{/str}}</h5>
+                <p class="small text-muted">{{#str}}clips_help, mod_buchbinder{{/str}}
+                    <a href="{{canvasurl}}">{{#str}}tab_canvas, mod_buchbinder{{/str}}</a></p>
+                {{#hasclips}}
+                <ul class="list-unstyled bb-clips mb-0">
+                {{#clips}}
+                    <li class="d-flex align-items-center mb-2">
+                        <img src="{{url}}" alt="{{filename}}" class="bb-clip-thumb mr-2 me-2">
+                        <div class="flex-grow-1 small">
+                            <code class="user-select-all">{{markdown}}</code><br>
+                            <a href="{{deleteurl}}" class="text-danger">{{#str}}delete{{/str}}</a>
+                        </div>
+                    </li>
+                {{/clips}}
+                </ul>
+                {{/hasclips}}
+            </div>
+        </div>
+    </aside>
+</div>

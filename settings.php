@@ -53,6 +53,13 @@ if ($ADMIN->fulltree) {
         [96 => '96', 120 => '120', 150 => '150', 200 => '200', 300 => '300']
     ));
 
+    $settings->add(new admin_setting_configcheckbox(
+        'buchbinder/backgroundimport',
+        new lang_string('backgroundimport', 'mod_buchbinder'),
+        new lang_string('backgroundimport_desc', 'mod_buchbinder'),
+        1
+    ));
+
     // Content harvester (server side proxy for web snippets).
     $settings->add(new admin_setting_heading(
         'buchbinder/harvesterheading',

@@ -89,6 +89,7 @@ function buchbinder_delete_instance($id) {
     $cm = get_coursemodule_from_instance('buchbinder', $id);
     if ($cm) {
         $document = new \mod_buchbinder\local\document($instance, context_module::instance($cm->id));
+        \mod_buchbinder\local\import_queue::delete_all($document);
         $document->delete_all();
     }
     // Documents derived from this master keep their copies.
@@ -117,7 +118,7 @@ function buchbinder_pluginfile($course, $cm, $context, $filearea, $args, $forced
 
     if ($filearea === 'source') {
         require_capability('mod/buchbinder:edit', $context);
-    } else if (in_array($filearea, ['page', 'pagecontent', 'audio'])) {
+    } else if (in_array($filearea, ['page', 'pagecontent', 'audio', 'clips'])) {
         require_capability('mod/buchbinder:view', $context);
     } else {
         return false;

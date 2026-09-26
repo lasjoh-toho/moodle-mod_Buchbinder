@@ -39,6 +39,8 @@ $string['audio_file'] = 'Aufnahme oder Audiodatei';
 $string['audio_tts'] = 'Text-to-Speech';
 $string['audiosaved'] = 'Audio gespeichert';
 $string['audiosource'] = 'Audioquelle';
+$string['backgroundimport'] = 'Import im Hintergrund';
+$string['backgroundimport_desc'] = 'Importe werden per Cron (Adhoc-Task) verarbeitet, damit große PDFs und Scan-Stapel nicht an Zeitlimits des Webservers scheitern. Setzt einen regelmäßig laufenden Cron voraus.';
 $string['bgcolor'] = 'Hintergrundfarbe';
 $string['blankpages'] = 'Leere Arbeitsblätter';
 $string['bold'] = 'Fett';
@@ -49,6 +51,11 @@ $string['buchbinder:print'] = 'Eco-Print-PDFs erstellen';
 $string['buchbinder:useassetbank'] = 'Seiten aus der Asset Bank übernehmen';
 $string['buchbinder:view'] = 'Buchbinder-Dokumente ansehen';
 $string['buchbinder:viewsolutions'] = 'Abgedeckte Lösungen sehen';
+$string['callout_caution'] = 'Vorsicht';
+$string['callout_important'] = 'Wichtig';
+$string['callout_note'] = 'Hinweis';
+$string['callout_tip'] = 'Tipp';
+$string['callout_warning'] = 'Achtung';
 $string['citation'] = 'Zitat';
 $string['citationaccessed'] = 'abgerufen am {$a}';
 $string['cleanup_chop'] = 'Schwarze Scanränder beschneiden';
@@ -64,6 +71,9 @@ $string['cleanupall'] = 'Alle gescannten Seiten optimieren';
 $string['cleanupwarning'] = 'Bereinigung vor dem Anlegen von Overlays ausführen: Beim Trennen einer Seite werden deren Overlays entfernt.';
 $string['clipboardsnippet'] = 'Aus Zwischenablage einfügen';
 $string['clipboardsnippet_help'] = 'Texte, Tabellen und Bilder aus Webseiten oder Dokumenten einfügen. Bitte die Herkunft angeben – das Zitat wird am Seitenende angezeigt.';
+$string['clipcreated'] = 'Ausschnitt gespeichert. In eine gestaltete Seite einfügen mit {$a}';
+$string['clips'] = 'Ausschnitte';
+$string['clips_help'] = 'Ausschnitte sind Bereiche aus importierten Seiten. Sie werden mit dem Werkzeug „Ausschnitt“ erstellt unter';
 $string['columnhelp'] = 'Auf Smartphones zoomt ein Tippen auf diese Spalte sie auf Bildschirmbreite.';
 $string['columnsfound'] = '{$a} Spalten erkannt.';
 $string['confirmdeletepage'] = 'Diese Seite samt allen Overlays löschen?';
@@ -72,8 +82,10 @@ $string['createpdf'] = 'PDF erstellen';
 $string['deleteoverlay'] = 'Löschen';
 $string['derivedfrom'] = 'Dieses Dokument enthält Seiten des Masters';
 $string['detectcolumns'] = 'Spalten erkennen';
+$string['dismiss'] = 'Aus der Liste entfernen';
 $string['ecoprint'] = 'Eco-Print';
 $string['ecoprint_help'] = 'Papiersparendes PDF erstellen: 2 oder 4 Seiten pro Blatt oder eine faltbare Broschüre. Der Tintensparmodus invertiert dunkle Seiten und entfernt graue Hintergründe. Abgedeckte Lösungen bleiben abgedeckt, außer bei der Lehrkraft-Version.';
+$string['editlayoutpage'] = 'Gestaltete Seite bearbeiten';
 $string['editorhelp'] = 'Werkzeug wählen und ein Rechteck auf der Seite aufziehen. Kästen per Ziehen verschieben, am Anfasser skalieren, mit den Pfeiltasten feinjustieren und mit Entf löschen.';
 $string['editpage'] = 'Seite bearbeiten';
 $string['editsource'] = 'Quelle bearbeiten';
@@ -91,6 +103,8 @@ $string['errorimportformat'] = 'Dieses Dateiformat wird nicht unterstützt.';
 $string['errornoghostscript'] = 'Für den PDF-Import wird Ghostscript benötigt. Bitte die Administration bitten, den Pfad zu Ghostscript (pathtogs) zu konfigurieren.';
 $string['errornoimagick'] = 'Der TIFF-Import benötigt die PHP-Erweiterung imagick.';
 $string['errornothtml'] = 'Hier können nur Textseiten bearbeitet werden.';
+$string['errornotimage'] = 'Ausschnitte können nur aus Bildseiten erstellt werden.';
+$string['errornotlayout'] = 'Diese Seite ist keine gestaltete Seite.';
 $string['errorpagerange'] = 'Ungültiger Seitenbereich. Beispiel: 1-4, 7, 10-';
 $string['errorpdfconversion'] = 'Das PDF konnte nicht umgewandelt werden: {$a}';
 $string['fontsize'] = 'Schriftgröße';
@@ -107,10 +121,17 @@ $string['harvestimages_desc'] = 'Bilder übernommener Ausschnitte in Moodle spei
 $string['import'] = 'Importieren';
 $string['importfiles'] = 'Dokumente importieren';
 $string['importfiles_help'] = 'Unterstützt: PDF, Word (.docx), HTML, Bild-Scans (PNG, JPG, GIF, WebP, TIFF) und Comic-Archive (.cbz/.zip). Jede Seite wird zu einer Seite des Dokuments.';
+$string['importjobs'] = 'Importe';
+$string['importqueued'] = 'Der Import läuft im Hintergrund. Die Seiten erscheinen, sobald er fertig ist.';
 $string['inksaver'] = 'Tintensparmodus';
 $string['inksaver_help'] = 'Dunkle Seiten werden invertiert, Farben in Graustufen umgewandelt und helle Hintergründe entfernt.';
 $string['ismaster'] = 'Als Master in der Asset Bank anbieten';
 $string['ismaster_help'] = 'Lehrkräfte, die diese Aktivität bearbeiten dürfen, können Auszüge daraus in Buchbinder-Aktivitäten anderer Kurse übernehmen.';
+$string['jobstale'] = 'Dieser Import wartet seit über 10 Minuten. Läuft der Cron dieser Moodle-Instanz?';
+$string['jobstatus_done'] = 'Fertig';
+$string['jobstatus_failed'] = 'Fehlgeschlagen';
+$string['jobstatus_queued'] = 'Wartet';
+$string['jobstatus_running'] = 'Läuft';
 $string['label'] = 'Beschriftung';
 $string['landscape'] = 'Querformat';
 $string['landscapeprotected'] = 'Geschütztes Querformat';
@@ -118,6 +139,123 @@ $string['layout_1up'] = '1 Seite pro Blatt';
 $string['layout_2up'] = '2 Seiten pro Blatt';
 $string['layout_4up'] = '4 Seiten pro Blatt';
 $string['layout_booklet'] = 'Broschüre (beidseitig über die kurze Kante drucken, falten)';
+$string['layoutpage'] = 'Gestaltete Seite';
+$string['layoutsaved'] = '{$a} gestaltete Seite(n) gespeichert.';
+$string['layoutsource'] = 'Inhalt';
+$string['layoutsource_help'] = 'Die Seite wird in Markdown mit den Layout-Blöcken von Quarto geschrieben: Spalten, Hinweisboxen, Bilder mit Breite und Seitenumbrüche. Die Syntax steht im Kasten rechts. Ein Seitenumbruch erzeugt eine weitere Seite.';
+$string['layoutsyntax'] = 'Syntax';
+$string['layoutsyntax_help'] = '# Überschrift
+**fett**, *kursiv*, - Liste, 1. Liste
+| A | B |
+|---|---|
+| Tabelle | Zelle |
+
+::: {.columns}
+::: {.column width="40%"}
+![Bildunterschrift](ausschnitt-1.png)
+:::
+::: {.column width="60%"}
+Text neben dem Bild
+:::
+:::
+
+::: {.callout-note}
+## Titel
+Hinweis (auch: tip, warning,
+important, caution)
+:::
+
+::: {.lines n=6}
+Schreiblinien für Antworten
+:::
+
+::: {.box}
+Kasten mit Rahmen
+:::
+
+![](ausschnitt-2.png){width=50%}
+
+{{< pagebreak >}}';
+$string['layouttemplate_blank'] = 'Leere Seite';
+$string['layouttemplate_blank_desc'] = 'Mit Überschrift und Text beginnen.';
+$string['layouttemplate_blank_source'] = '# Titel
+
+Text
+';
+$string['layouttemplate_imagetext'] = 'Bild und Text';
+$string['layouttemplate_imagetext_desc'] = 'Ein Ausschnitt aus einer importierten Seite neben Erläuterungen.';
+$string['layouttemplate_imagetext_source'] = '# Titel
+
+::: {.columns}
+::: {.column width="40%"}
+![Bildunterschrift](ausschnitt-1.png)
+:::
+::: {.column width="60%"}
+Erläuterung zum Bild.
+
+::: {.callout-tip}
+## Genau hinsehen
+Was fällt dir auf?
+:::
+:::
+:::
+';
+$string['layouttemplate_twocolumns'] = 'Zwei Spalten';
+$string['layouttemplate_twocolumns_desc'] = 'Text in zwei gleich breiten Spalten.';
+$string['layouttemplate_twocolumns_source'] = '# Titel
+
+::: {.columns}
+::: {.column width="50%"}
+## Links
+
+Text
+:::
+::: {.column width="50%"}
+## Rechts
+
+Text
+:::
+:::
+';
+$string['layouttemplate_vocabulary'] = 'Vokabelliste';
+$string['layouttemplate_vocabulary_desc'] = 'Tabelle mit Wörtern, Übersetzungen und Beispielen.';
+$string['layouttemplate_vocabulary_source'] = '# Vokabeln
+
+| Wort | Übersetzung | Beispiel |
+|---|---|---|
+| bonjour | guten Tag | Bonjour, Marie ! |
+|  |  |  |
+|  |  |  |
+';
+$string['layouttemplate_worksheet'] = 'Arbeitsblatt';
+$string['layouttemplate_worksheet_desc'] = 'Titel, Aufgaben mit Arbeitsanweisung und Schreiblinien.';
+$string['layouttemplate_worksheet_source'] = '# Arbeitsblatt
+
+Name: ______________________  Datum: ____________
+
+::: {.callout-note}
+## Aufgabe 1
+Lies den Text und beantworte die Fragen.
+:::
+
+::: {.lines n=5}
+:::
+
+::: {.callout-note}
+## Aufgabe 2
+Beschreibe das Bild.
+:::
+
+::: {.columns}
+::: {.column width="40%"}
+![](ausschnitt-1.png)
+:::
+::: {.column width="60%"}
+::: {.lines n=6}
+:::
+:::
+:::
+';
 $string['linkspread'] = 'Mit nächster Seite verbinden';
 $string['mask_black'] = 'Schwärzen';
 $string['mask_white'] = 'Weißen';
@@ -130,6 +268,7 @@ $string['maxpages_desc'] = 'Längere Dokumente werden abgeschnitten.';
 $string['modulename'] = 'Buchbinder';
 $string['modulename_help'] = 'Buchbinder verwandelt PDFs, Scans, Word-Dateien und Webinhalte in modulare, interaktive Lernmaterialien: Scans bereinigen, direkt auf Seiten schreiben, unsichtbare Audio-Trigger, Glossarbegriffe und Lösungsabdeckungen ergänzen, eine Textansicht für Smartphones anbieten und papiersparende Broschüren drucken.';
 $string['modulenameplural'] = 'Buchbinder-Dokumente';
+$string['newlayoutpage'] = 'Neue gestaltete Seite';
 $string['nocitation'] = 'Kein Zitat angezeigt';
 $string['nocolumnsfound'] = 'Kein mehrspaltiges Layout erkannt.';
 $string['noglossaries'] = 'In diesem Kurs gibt es kein Glossar.';
@@ -212,6 +351,7 @@ $string['term'] = 'Begriff';
 $string['text'] = 'Text';
 $string['textcolor'] = 'Textfarbe';
 $string['textview'] = 'Textansicht';
+$string['tool_clip'] = 'Ausschnitt';
 $string['tool_select'] = 'Auswählen';
 $string['toolbar'] = 'Dokumentwerkzeuge';
 $string['tools'] = 'Werkzeuge';

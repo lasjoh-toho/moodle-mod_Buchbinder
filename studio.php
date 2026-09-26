@@ -24,6 +24,7 @@
 
 use mod_buchbinder\local\document;
 use mod_buchbinder\local\harvester;
+use mod_buchbinder\local\import_queue;
 use mod_buchbinder\local\importer;
 
 require_once(__DIR__ . '/../../config.php');
@@ -85,6 +86,9 @@ if ($action !== '') {
         case 'unlinkspread':
             $document->unlink_spread($pageid);
             break;
+        case 'dismissjob':
+            import_queue::dismiss($document, required_param('jobid', PARAM_INT));
+            break;
         case 'delete':
             if (!optional_param('confirm', 0, PARAM_BOOL)) {
                 echo $OUTPUT->header();
@@ -104,6 +108,15 @@ if ($action !== '') {
 
 $maxbytes = document::max_bytes($context);
 $content = '';
+if (in_array($tab, ['import', 'pages'])) {
+    $jobs = import_queue::export($document, new moodle_url($baseurl, ['action' => 'dismissjob', 'sesskey' => sesskey()]));
+    if ($jobs['hasjobs']) {
+        $content .= $OUTPUT->render_from_template('mod_buchbinder/studio_jobs', $jobs);
+        if ($jobs['pending']) {
+            $PAGE->requires->js_call_amd('mod_buchbinder/jobs', 'init', [$cm->id]);
+        }
+    }
+}
 
 switch ($tab) {
     case 'import':
@@ -139,17 +152,17 @@ switch ($tab) {
             $usercontext = context_user::instance($USER->id);
             $ops = array_keys(array_filter(['chop' => $data->chop, 'deskew' => $data->deskew, 'shadow' => $data->shadow,
                 'split' => $data->split]));
-            $importer = new importer($document, $ops);
-            $total = 0;
-            foreach ($fs->get_area_files($usercontext->id, 'user', 'draft', $draftid, 'sortorder, filename', false) as $file) {
-                try {
-                    $total += $importer->import_file($file, ['title' => $data->title, 'author' => $data->author,
-                        'url' => $data->url ?: null]);
-                } catch (moodle_exception $e) {
-                    \core\notification::error($file->get_filename() . ': ' . $e->getMessage());
-                }
-            }
+            $files = $fs->get_area_files($usercontext->id, 'user', 'draft', $draftid, 'sortorder, filename', false);
+            $job = import_queue::enqueue($document, array_values($files), $ops, ['title' => $data->title,
+                'author' => $data->author, 'url' => $data->url ?: null]);
             $fs->delete_area_files($usercontext->id, 'user', 'draft', $draftid);
+            if ($job->status === import_queue::STATUS_QUEUED) {
+                redirect(new moodle_url($baseurl, ['tab' => 'pages']), get_string('importqueued', 'mod_buchbinder'));
+            }
+            if ($job->message) {
+                \core\notification::error(nl2br(s($job->message)));
+            }
+            $total = $job->pagecount;
             redirect(new moodle_url($baseurl, ['tab' => 'pages']), get_string('pagesimported', 'mod_buchbinder', $total));
         }
 
@@ -160,6 +173,11 @@ switch ($tab) {
             }
         }
         $content .= html_writer::div(
+            html_writer::link(
+                new moodle_url('/mod/buchbinder/layout.php', ['id' => $cm->id]),
+                get_string('newlayoutpage', 'mod_buchbinder'),
+                ['class' => 'btn btn-primary mr-2 me-2']
+            ) .
             html_writer::link(
                 new moodle_url('/mod/buchbinder/snippet.php', ['id' => $cm->id]),
                 get_string('clipboardsnippet', 'mod_buchbinder'),
@@ -214,11 +232,16 @@ switch ($tab) {
                     'unlink' => $act('unlinkspread'),
                     'delete' => $act('delete'),
                     'canvas' => (new moodle_url($baseurl, ['tab' => 'canvas', 'pageid' => $page->id]))->out(false),
-                    'edit' => (new moodle_url('/mod/buchbinder/snippet.php', ['id' => $cm->id, 'pageid' => $page->id]))
-                        ->out(false),
+                    'edit' => (new moodle_url($page->pagetype === 'layout' ? '/mod/buchbinder/layout.php' :
+                        '/mod/buchbinder/snippet.php', ['id' => $cm->id, 'pageid' => $page->id]))->out(false),
                 ],
             ];
         }
+        $content .= html_writer::div(html_writer::link(
+            new moodle_url('/mod/buchbinder/layout.php', ['id' => $cm->id]),
+            get_string('newlayoutpage', 'mod_buchbinder'),
+            ['class' => 'btn btn-primary']
+        ), 'mb-3');
         $content .= $OUTPUT->render_from_template('mod_buchbinder/studio_pages', [
             'pages' => $items,
             'haspages' => !empty($items),
@@ -286,7 +309,7 @@ switch ($tab) {
             'nav' => $nav,
             'isimage' => $current->pagetype === 'image',
             'imageurl' => $current->pagetype === 'image' ? $document->page_image_url($current)->out(false) : '',
-            'html' => $current->pagetype === 'html' ? $document->page_html($current) : '',
+            'html' => $current->pagetype !== 'image' ? $document->page_html($current) : '',
             'ratio' => $current->height ? round($current->height / max(1, $current->width) * 100, 4) : 141.4286,
             'config' => json_encode($config),
             'hasglossaries' => !empty($glossaries),

@@ -14,18 +14,22 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
+namespace mod_buchbinder\task;
+
 /**
- * Version information for mod_buchbinder.
+ * Ad-hoc task that processes a queued import.
  *
  * @package    mod_buchbinder
  * @copyright  2026 Buchbinder contributors
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-
-defined('MOODLE_INTERNAL') || die();
-
-$plugin->component = 'mod_buchbinder';
-$plugin->version   = 2026092700;
-$plugin->requires  = 2023100900; // Moodle 4.3.
-$plugin->maturity  = MATURITY_ALPHA;
-$plugin->release   = '0.3.0';
+class import_job extends \core\task\adhoc_task {
+    /**
+     * Run the import.
+     */
+    public function execute() {
+        $data = $this->get_custom_data();
+        mtrace('mod_buchbinder: processing import job ' . (int)$data->jobid);
+        \mod_buchbinder\local\import_queue::process((int)$data->jobid);
+    }
+}

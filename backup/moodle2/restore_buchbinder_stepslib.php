@@ -105,6 +105,7 @@ class restore_buchbinder_activity_structure_step extends restore_activity_struct
     protected function after_execute() {
         global $DB;
         $this->add_related_files('mod_buchbinder', 'intro', null);
+        $this->add_related_files('mod_buchbinder', 'clips', null);
         $this->add_related_files('mod_buchbinder', 'source', 'buchbinder_source');
         $this->add_related_files('mod_buchbinder', 'page', 'buchbinder_page');
         $this->add_related_files('mod_buchbinder', 'pagecontent', 'buchbinder_page');

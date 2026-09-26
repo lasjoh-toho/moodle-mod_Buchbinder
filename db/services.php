@@ -53,4 +53,18 @@ $functions = [
         'ajax' => true,
         'capabilities' => 'mod/buchbinder:view',
     ],
+    'mod_buchbinder_get_import_jobs' => [
+        'classname' => \mod_buchbinder\external\get_import_jobs::class,
+        'description' => 'Status of background imports.',
+        'type' => 'read',
+        'ajax' => true,
+        'capabilities' => 'mod/buchbinder:edit',
+    ],
+    'mod_buchbinder_create_clip' => [
+        'classname' => \mod_buchbinder\external\create_clip::class,
+        'description' => 'Cut a region out of an image page for composed pages.',
+        'type' => 'write',
+        'ajax' => true,
+        'capabilities' => 'mod/buchbinder:edit',
+    ],
 ];

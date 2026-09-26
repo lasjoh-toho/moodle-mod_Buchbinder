@@ -1,0 +1,48 @@
+{{!
+    This file is part of Moodle - https://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Moodle is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
+}}
+{{!
+    @template mod_buchbinder/studio_jobs
+
+    Background imports and their status.
+
+    Example context (json):
+    {"hasjobs": true, "pending": true, "stale": false,
+     "jobs": [{"id": 1, "filenames": "scan.pdf", "status": "Queued", "open": true, "failed": false, "pagecount": 0,
+               "message": "", "time": "26/09/26, 10:00", "dismissurl": ""}]}
+}}
+<div class="card mb-3 bb-jobs" {{#pending}}data-pending="1"{{/pending}}>
+    <div class="card-body p-2">
+        <strong>{{#str}}importjobs, mod_buchbinder{{/str}}</strong>
+        <ul class="list-unstyled mb-0 mt-1">
+        {{#jobs}}
+            <li class="d-flex flex-wrap align-items-center py-1 border-top" data-jobid="{{id}}">
+                <span class="mr-2 me-2 small text-muted">{{time}}</span>
+                <span class="mr-2 me-2 text-truncate" style="max-width: 24rem;" title="{{filenames}}">{{filenames}}</span>
+                {{#open}}<span class="badge badge-info bg-info mr-2 me-2">{{status}}</span>
+                    <span class="spinner-border spinner-border-sm text-info" role="status" aria-hidden="true"></span>{{/open}}
+                {{^open}}
+                    <span class="badge {{#failed}}badge-danger bg-danger{{/failed}}{{^failed}}badge-success bg-success{{/failed}} mr-2 me-2">{{status}}</span>
+                    <span class="small mr-2 me-2">{{#str}}pagesimported, mod_buchbinder, {{pagecount}}{{/str}}</span>
+                    <a class="small ml-auto ms-auto" href="{{dismissurl}}">{{#str}}dismiss, mod_buchbinder{{/str}}</a>
+                {{/open}}
+                {{#message}}<div class="w-100 small text-danger" style="white-space: pre-wrap;">{{message}}</div>{{/message}}
+            </li>
+        {{/jobs}}
+        </ul>
+        {{#stale}}<div class="small text-warning mt-1">{{#str}}jobstale, mod_buchbinder{{/str}}</div>{{/stale}}
+    </div>
+</div>

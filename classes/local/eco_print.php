@@ -153,7 +153,7 @@ class eco_print {
         $bx = $sx + self::MARGIN + ($aw - $bw) / 2;
         $by = $sy + self::MARGIN + ($ah - $bh) / 2;
 
-        if ($page->pagetype === 'html') {
+        if ($page->pagetype !== 'image') {
             $this->render_html($page, $bx, $by, $bw, $bh);
         } else {
             $img = $this->document->load_page_image($page);
@@ -225,18 +225,25 @@ class eco_print {
      */
     protected function render_html(\stdClass $page, float $x, float $y, float $w, float $h): void {
         $context = $this->document->get_context();
-        $dir = make_request_directory();
-        $html = $page->content ?? '';
-        $fs = get_file_storage();
-        foreach ($fs->get_area_files($context->id, 'mod_buchbinder', 'pagecontent', $page->id, 'id', false) as $file) {
-            $path = $dir . '/' . $file->get_id() . '_' . clean_filename($file->get_filename());
-            $file->copy_content_to($path);
-            $html = str_replace('@@PLUGINFILE@@' . $file->get_filepath() . rawurlencode($file->get_filename()), $path, $html);
-            $html = str_replace('@@PLUGINFILE@@' . $file->get_filepath() . $file->get_filename(), $path, $html);
+        // TCPDF gets embedded images as data ("@" + base64), which works independent of paths and URLs.
+        $embed = fn(\stored_file $file) => '@' . base64_encode($file->get_content());
+        if ($page->pagetype === 'layout') {
+            // Composed page: tables instead of flexbox. Text parts are purified by the renderer.
+            $clips = $this->document->get_clips();
+            $renderer = new layout_renderer(fn(string $src) => isset($clips[$src]) ? $embed($clips[$src]) : null, true);
+            $html = $renderer->render($page->content ?? '');
+        } else {
+            $html = format_text($page->content ?? '', FORMAT_HTML, ['context' => $context, 'filter' => false]);
+            $fs = get_file_storage();
+            foreach ($fs->get_area_files($context->id, 'mod_buchbinder', 'pagecontent', $page->id, 'id', false) as $file) {
+                $data = $embed($file);
+                $prefix = '@@PLUGINFILE@@' . $file->get_filepath();
+                $html = str_replace([$prefix . rawurlencode($file->get_filename()), $prefix . $file->get_filename()], $data, $html);
+            }
         }
-        $html = format_text($html, FORMAT_HTML, ['context' => $context, 'filter' => false]);
         $this->pdf->SetTextColor(0, 0, 0);
         $this->pdf->SetFont('freesans', '', max(6, 11 * $w / 190));
+        $this->pdf->setHtmlVSpace(['p' => [['h' => 0, 'n' => 0], ['h' => 1, 'n' => 0.5]]]);
         $this->pdf->writeHTMLCell($w, $h, $x, $y, $html, 0, 0, false, true, '', true);
     }
 

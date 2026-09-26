@@ -9,7 +9,7 @@ anlegen, eine Textansicht für Smartphones anbieten und papiersparend drucken.
 > Komponentenname: `mod_buchbinder`. Moodle verlangt kleingeschriebene Komponentennamen, daher
 > heißt das Verzeichnis `mod/buchbinder`, obwohl das Repository `moodle-mod_Buchbinder` heißt.
 
-Status: **0.2.0 (Alpha)**. Der gesamte Arbeitsablauf ist umgesetzt; Punkte, die noch fehlen,
+Status: **0.3.0 (Alpha)**. Der gesamte Arbeitsablauf ist umgesetzt; Punkte, die noch fehlen,
 stehen unter [Roadmap](#roadmap).
 
 ## Arbeitsablauf im Publishing Studio
@@ -19,7 +19,7 @@ stehen unter [Roadmap](#roadmap).
 | 1a Import | **1. Import** | PDF, Word (.docx), HTML, Bilder (PNG/JPG/GIF/WebP/TIFF), Comic-Archive (.cbz/.zip), leere Arbeitsblätter (Blanko, Liniert, Kariert, Notenlinien), Web-Ausschnitt (Harvester), Einfügen aus der Zwischenablage, Asset Bank |
 | 1b Bereinigung | **2. Seiten & Bereinigung** | Ränder beschneiden, entzerren (Schräglage ±5°), Schatten/Vergilbung entfernen, Doppelseiten am Mittelsteg trennen, Querformatschutz, Doppelseiten verknüpfen/lösen, drehen, sortieren |
 | 1c Fundstellen | **3. Quellen** | Herkunft (Titel, Autor/in, URL, Abrufdatum) wird beim Import erfasst und als verlinktes Zitat am Seitenende angezeigt |
-| 2–4 Canvas | **4. Canvas & Overlays** | Überschreiben mit Papierfarb-Abgleich, Abdeckungen, Audio-Trigger, Glossarbegriffe, Textblöcke für die Textansicht, Spaltenbereiche mit automatischer Spaltenerkennung |
+| 2–4 Canvas | **4. Canvas & Overlays** | Ausschnitte für gestaltete Seiten, Überschreiben mit Papierfarb-Abgleich, Abdeckungen, Audio-Trigger, Glossarbegriffe, Textblöcke für die Textansicht, Spaltenbereiche mit automatischer Spaltenerkennung |
 | 5 Veröffentlichung | **5. Veröffentlichen** | Seitenauszug (z. B. `5-12`), Textansicht und Druck an/aus, Master für die Asset Bank, Verwendungsnachweis |
 
 ## Funktionen im Detail
@@ -36,6 +36,29 @@ stehen unter [Roadmap](#roadmap).
   `table.klasse`), Skripte/Formulare/Event-Handler werden entfernt, Links absolut gemacht, Bilder in
   Moodle kopiert, das Ergebnis mit HTMLPurifier bereinigt.
 - **Zwischenablage**: Editor mit Bildern; Quelle wird mit abgefragt.
+
+- **Import im Hintergrund**: Hochgeladene Dateien werden als Adhoc-Task per Cron verarbeitet, damit
+  große PDFs und Scan-Stapel nicht an Zeitlimits scheitern. Das Studio zeigt den Status und lädt sich
+  neu, sobald der Import fertig ist; wartet ein Import über 10 Minuten, weist es auf einen evtl.
+  nicht laufenden Cron hin. Abschaltbar in den Einstellungen (dann sofortiger Import).
+
+### Layout-System: gestaltete Seiten (`classes/local/layout_renderer.php`, `layout.php`)
+Neue Seiten werden in Markdown mit den Layout-Blöcken des **Quarto**-Formats geschrieben. Quarto
+selbst (ein externes Programm) wird nicht benötigt; Buchbinder rendert die Syntax direkt:
+
+- Spalten `::: {.columns}` / `::: {.column width="40%"}`, verschachtelbar
+- Hinweisboxen `::: {.callout-note|tip|warning|important|caution}` mit Titel aus `title=` oder
+  der ersten Überschrift
+- Bilder mit Breite `![Bildunterschrift](ausschnitt-1.png){width=50%}`, allein stehende Bilder
+  werden zur Abbildung mit Unterschrift
+- Seitenumbruch `{{< pagebreak >}}` erzeugt weitere Seiten
+- Buchbinder-Erweiterungen: `::: {.lines n=6}` (Schreiblinien), `::: {.box}` (Rahmen)
+- Vorlagen: Leere Seite, Arbeitsblatt, Zwei Spalten, Bild und Text, Vokabelliste
+
+**Ausschnitte** verbinden Import und Layout: Mit dem Werkzeug „Ausschnitt“ im Canvas wird ein
+Bereich aus einer importierten Seite ausgeschnitten und steht als `ausschnitt-N.png` zur
+Verfügung. Gestaltete Seiten werden am Bildschirm responsiv (Spalten untereinander auf
+Smartphones) und im Eco-Print als Tabellenlayout ausgegeben.
 
 ### Scan-Optimierung (`classes/local/image_cleanup.php`, nur GD)
 - Border Chopping: dunkle Randzeilen/-spalten werden entfernt (max. 20 % je Kante).
@@ -114,14 +137,14 @@ vendor/bin/phpunit --testsuite mod_buchbinder_testsuite
 ```
 Die Tests decken Seitenbereiche, Ausschießen, Scan-Bereinigung (synthetische Scans), das
 Dokumentmodell (Doppelseiten, Overlays, eingebrannte Abdeckungen, Asset Bank), die Webservices
-inklusive Rechteprüfung, Backup/Restore und Duplizieren, den PDF-Druck in allen Layouts, den Word-Import und die Harvester-Helfer ab.
+inklusive Rechteprüfung, Backup/Restore und Duplizieren, das Layout-System, Ausschnitte, den Hintergrund-Import, den PDF-Druck in allen Layouts, den Word-Import und die Harvester-Helfer ab.
 
 JavaScript liegt in `amd/src` als AMD-Module; `amd/build/*.min.js` sind unminifizierte Kopien mit
 Modulnamen. Mit `grunt amd` im Moodle-Verzeichnis lassen sich echte Builds erzeugen.
 
 ## Roadmap
-- Layout-System für neue Seiten und das Arrangieren importierter Inhalte (z. B. auf Basis von Quarto)
-- Texterkennung (OCR), um Reflow-Textblöcke automatisch zu füllen
+- Texterkennung (OCR), um Reflow-Textblöcke automatisch zu füllen – geplant über Tesseract auf dem
+  Server (wie Ghostscript per Pfad konfiguriert); Moodles KI-Schnittstelle (ab 4.5) bietet keine
+  Texterkennung
 - Serverseitiges Text-to-Speech als Alternative zur Browser-Sprachausgabe
-- Rendering großer Importe als Hintergrundaufgabe (ad-hoc Task) statt im Request
 - Unterstützung der Moodle-App

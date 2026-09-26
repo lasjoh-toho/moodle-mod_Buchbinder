@@ -28,6 +28,8 @@ use stdClass;
  *  - page:        raster image of an image page, itemid = page id
  *  - pagecontent: embedded files of an html page, itemid = page id
  *  - audio:       audio of an audio overlay, itemid = overlay id
+ *  - clips:       regions cut out of image pages for composed pages, itemid = 0
+ *  - jobfile:     uploads waiting for a background import, itemid = job id
  *  - pagemasked:  cached learner copy of a page image with burned in masks, itemid = page id
  *
  * @package    mod_buchbinder
@@ -230,6 +232,142 @@ class document {
     }
 
     /**
+     * Add composed pages from a layout source. Page breaks create several pages.
+     *
+     * @param string $source Quarto flavoured Markdown
+     * @param int|null $afterpageid
+     * @return stdClass[] created pages
+     */
+    public function add_layout_pages(string $source, ?int $afterpageid = null): array {
+        $pages = [];
+        foreach (layout_renderer::split_pages($source) as $part) {
+            $page = $this->insert_page(['pagetype' => 'layout', 'content' => $part, 'contentformat' => FORMAT_MARKDOWN,
+                'width' => 1240, 'height' => 1754], $afterpageid);
+            $afterpageid = $page->id;
+            $pages[] = $page;
+        }
+        return $pages;
+    }
+
+    /**
+     * Update a composed page. Page breaks in the source create further pages after it.
+     *
+     * @param int $pageid
+     * @param string $source
+     * @return int number of pages the source was split into
+     */
+    public function update_layout_page(int $pageid, string $source): int {
+        global $DB;
+        $page = $this->get_page($pageid);
+        $parts = layout_renderer::split_pages($source);
+        $DB->update_record('buchbinder_page', (object)['id' => $page->id, 'content' => array_shift($parts),
+            'timemodified' => time()]);
+        if ($parts) {
+            $this->add_layout_pages(implode("\n\n{{< pagebreak >}}\n\n", $parts), $page->id);
+        }
+        return count($parts) + 1;
+    }
+
+    // Clips: regions cut out of image pages for use in layouts.
+
+    /**
+     * Cut a region out of an image page.
+     *
+     * @param int $pageid
+     * @param float[] $box x, y, w, h relative
+     * @return string file name of the clip
+     */
+    public function create_clip(int $pageid, array $box): string {
+        $page = $this->get_page($pageid);
+        $img = $page->pagetype === 'image' ? $this->load_page_image($page) : null;
+        if (!$img) {
+            throw new \moodle_exception('errornotimage', 'mod_buchbinder');
+        }
+        [$x, $y, $w, $h] = array_map(fn($v) => max(0.0, min(1.0, (float)$v)), $box);
+        $iw = imagesx($img);
+        $ih = imagesy($img);
+        $rect = ['x' => (int)floor($x * $iw), 'y' => (int)floor($y * $ih),
+            'width' => max(1, (int)round(min($w, 1 - $x) * $iw)), 'height' => max(1, (int)round(min($h, 1 - $y) * $ih))];
+        $clip = imagecrop($img, $rect);
+        $number = 1;
+        foreach ($this->get_clips() as $file) {
+            if (preg_match('/^ausschnitt-(\d+)\.png$/', $file->get_filename(), $m)) {
+                $number = max($number, (int)$m[1] + 1);
+            }
+        }
+        $filename = 'ausschnitt-' . $number . '.png';
+        get_file_storage()->create_file_from_string([
+            'contextid' => $this->context->id,
+            'component' => 'mod_buchbinder',
+            'filearea' => 'clips',
+            'itemid' => 0,
+            'filepath' => '/',
+            'filename' => $filename,
+        ], image_cleanup::to_png($clip));
+        return $filename;
+    }
+
+    /**
+     * All clips.
+     *
+     * @return \stored_file[] keyed by file name
+     */
+    public function get_clips(): array {
+        $clips = [];
+        foreach (get_file_storage()->get_area_files($this->context->id, 'mod_buchbinder', 'clips', 0, 'filename', false) as $f) {
+            $clips[$f->get_filename()] = $f;
+        }
+        uksort($clips, 'strnatcmp');
+        return $clips;
+    }
+
+    /**
+     * Whether a clip exists.
+     *
+     * @param string $filename
+     * @return bool
+     */
+    public function clip_exists(string $filename): bool {
+        return clean_param($filename, PARAM_FILE) === $filename && get_file_storage()->file_exists(
+            $this->context->id,
+            'mod_buchbinder',
+            'clips',
+            0,
+            '/',
+            $filename
+        );
+    }
+
+    /**
+     * URL of a clip.
+     *
+     * @param string $filename
+     * @return moodle_url
+     */
+    public function clip_url(string $filename): moodle_url {
+        return moodle_url::make_pluginfile_url($this->context->id, 'mod_buchbinder', 'clips', 0, '/', $filename);
+    }
+
+    /**
+     * Delete a clip.
+     *
+     * @param string $filename
+     */
+    public function delete_clip(string $filename): void {
+        $file = get_file_storage()->get_file(
+            $this->context->id,
+            'mod_buchbinder',
+            'clips',
+            0,
+            '/',
+            clean_param($filename, PARAM_FILE)
+        );
+        if ($file) {
+            $file->delete();
+        }
+    }
+
+    /**
      * Update the content of an html page.
      *
      * @param int $pageid
@@ -345,6 +483,15 @@ class document {
      * @return string
      */
     public function page_html(stdClass $page): string {
+        if ($page->pagetype === 'layout') {
+            $renderer = new layout_renderer(fn($src) => $this->clip_exists($src) ? $this->clip_url($src)->out(false) : null);
+            // The renderer purifies all text and validates the attributes it generates itself.
+            return format_text(
+                $renderer->render($page->content ?? ''),
+                FORMAT_HTML,
+                ['context' => $this->context, 'noclean' => true]
+            );
+        }
         $html = file_rewrite_pluginfile_urls(
             $page->content ?? '',
             'pluginfile.php',
@@ -872,6 +1019,12 @@ class document {
                 }
             }
             $count++;
+        }
+        // Clips used by composed pages; existing clips of the same name are kept.
+        foreach ($master->get_clips() as $filename => $clip) {
+            if (!$this->clip_exists($filename)) {
+                $fs->create_file_from_storedfile(['contextid' => $this->context->id], $clip);
+            }
         }
         // Remove spread links whose partner was not copied.
         foreach ($spreadmap as $spreadid) {

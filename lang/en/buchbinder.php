@@ -39,6 +39,8 @@ $string['audio_file'] = 'Recording or audio file';
 $string['audio_tts'] = 'Text to speech';
 $string['audiosaved'] = 'Audio saved';
 $string['audiosource'] = 'Audio source';
+$string['backgroundimport'] = 'Import in the background';
+$string['backgroundimport_desc'] = 'Imports are processed by cron (ad-hoc task), so large PDFs and scan batches do not hit time limits of the web server. Requires a regularly running cron.';
 $string['bgcolor'] = 'Background colour';
 $string['blankpages'] = 'Empty worksheets';
 $string['bold'] = 'Bold';
@@ -49,6 +51,11 @@ $string['buchbinder:print'] = 'Create eco print PDFs';
 $string['buchbinder:useassetbank'] = 'Copy pages from the asset bank';
 $string['buchbinder:view'] = 'View Buchbinder documents';
 $string['buchbinder:viewsolutions'] = 'See masked solutions';
+$string['callout_caution'] = 'Caution';
+$string['callout_important'] = 'Important';
+$string['callout_note'] = 'Note';
+$string['callout_tip'] = 'Tip';
+$string['callout_warning'] = 'Warning';
 $string['citation'] = 'Citation';
 $string['citationaccessed'] = 'accessed {$a}';
 $string['cleanup_chop'] = 'Chop black scanner borders';
@@ -64,6 +71,9 @@ $string['cleanupall'] = 'Optimise all scanned pages';
 $string['cleanupwarning'] = 'Run the cleanup before adding overlays: splitting a page removes its overlays.';
 $string['clipboardsnippet'] = 'Paste from clipboard';
 $string['clipboardsnippet_help'] = 'Paste text, tables and images copied from a web page or document. Please record where the content comes from – the citation is shown below the page.';
+$string['clipcreated'] = 'Clip saved. Insert it into a composed page with {$a}';
+$string['clips'] = 'Clips';
+$string['clips_help'] = 'Clips are regions cut out of imported pages. Create them with the "Clip" tool in';
 $string['columnhelp'] = 'On smartphones a tap on this column zooms it to the screen width.';
 $string['columnsfound'] = '{$a} columns detected.';
 $string['confirmdeletepage'] = 'Delete this page including all overlays?';
@@ -72,8 +82,10 @@ $string['createpdf'] = 'Create PDF';
 $string['deleteoverlay'] = 'Delete';
 $string['derivedfrom'] = 'This document contains pages of the master';
 $string['detectcolumns'] = 'Detect columns';
+$string['dismiss'] = 'Remove from list';
 $string['ecoprint'] = 'Eco print';
 $string['ecoprint_help'] = 'Create a paper saving PDF: 2 or 4 pages per sheet or a folded booklet. The ink saver inverts dark pages and removes grey backgrounds. Masked solutions are always covered unless you choose the teacher copy.';
+$string['editlayoutpage'] = 'Edit composed page';
 $string['editorhelp'] = 'Choose a tool and drag a rectangle on the page. Move boxes by dragging, resize them with the handle, fine-tune with the arrow keys and delete them with the Delete key.';
 $string['editpage'] = 'Edit page';
 $string['editsource'] = 'Edit source';
@@ -91,6 +103,8 @@ $string['errorimportformat'] = 'This file format is not supported.';
 $string['errornoghostscript'] = 'Ghostscript is required to import PDF files. Please ask the administrator to configure the path to Ghostscript (pathtogs).';
 $string['errornoimagick'] = 'TIFF import requires the PHP imagick extension.';
 $string['errornothtml'] = 'Only text pages can be edited here.';
+$string['errornotimage'] = 'Clips can only be cut out of image pages.';
+$string['errornotlayout'] = 'This page is not a composed page.';
 $string['errorpagerange'] = 'Invalid page range. Example: 1-4, 7, 10-';
 $string['errorpdfconversion'] = 'The PDF could not be converted: {$a}';
 $string['fontsize'] = 'Font size';
@@ -107,10 +121,17 @@ $string['harvestimages_desc'] = 'Store images of harvested snippets in Moodle in
 $string['import'] = 'Import';
 $string['importfiles'] = 'Import documents';
 $string['importfiles_help'] = 'Supported: PDF, Word (.docx), HTML, image scans (PNG, JPG, GIF, WebP, TIFF) and comic archives (.cbz/.zip). Every page becomes a page of the document.';
+$string['importjobs'] = 'Imports';
+$string['importqueued'] = 'The import runs in the background. Pages appear as soon as it is finished.';
 $string['inksaver'] = 'Ink saver';
 $string['inksaver_help'] = 'Dark pages are inverted, colours converted to greyscale and light backgrounds removed.';
 $string['ismaster'] = 'Offer as master in the asset bank';
 $string['ismaster_help'] = 'Teachers who can edit this activity can copy excerpts of it into Buchbinder activities of other courses.';
+$string['jobstale'] = 'This import is waiting for more than 10 minutes. Is cron running on this site?';
+$string['jobstatus_done'] = 'Done';
+$string['jobstatus_failed'] = 'Failed';
+$string['jobstatus_queued'] = 'Queued';
+$string['jobstatus_running'] = 'Running';
 $string['label'] = 'Label';
 $string['landscape'] = 'Landscape';
 $string['landscapeprotected'] = 'Protected landscape';
@@ -118,6 +139,123 @@ $string['layout_1up'] = '1 page per sheet';
 $string['layout_2up'] = '2 pages per sheet';
 $string['layout_4up'] = '4 pages per sheet';
 $string['layout_booklet'] = 'Booklet (print double-sided, flip on short edge, fold)';
+$string['layoutpage'] = 'Composed page';
+$string['layoutsaved'] = '{$a} composed page(s) saved.';
+$string['layoutsource'] = 'Content';
+$string['layoutsource_help'] = 'Write the page in Markdown with the layout blocks of Quarto: columns, callouts, images with width and page breaks. The box on the right lists the syntax. A page break creates a further page.';
+$string['layoutsyntax'] = 'Syntax';
+$string['layoutsyntax_help'] = '# Heading
+**bold**, *italic*, - list, 1. list
+| A | B |
+|---|---|
+| table | cell |
+
+::: {.columns}
+::: {.column width="40%"}
+![Caption](ausschnitt-1.png)
+:::
+::: {.column width="60%"}
+Text beside the picture
+:::
+:::
+
+::: {.callout-note}
+## Title
+Note (also: tip, warning,
+important, caution)
+:::
+
+::: {.lines n=6}
+Writing lines for answers
+:::
+
+::: {.box}
+Framed box
+:::
+
+![](ausschnitt-2.png){width=50%}
+
+{{< pagebreak >}}';
+$string['layouttemplate_blank'] = 'Empty page';
+$string['layouttemplate_blank_desc'] = 'Start with a heading and text.';
+$string['layouttemplate_blank_source'] = '# Title
+
+Text
+';
+$string['layouttemplate_imagetext'] = 'Picture and text';
+$string['layouttemplate_imagetext_desc'] = 'A clip from an imported page beside explanations.';
+$string['layouttemplate_imagetext_source'] = '# Title
+
+::: {.columns}
+::: {.column width="40%"}
+![Caption](ausschnitt-1.png)
+:::
+::: {.column width="60%"}
+Explanation of the picture.
+
+::: {.callout-tip}
+## Look closely
+What do you notice?
+:::
+:::
+:::
+';
+$string['layouttemplate_twocolumns'] = 'Two columns';
+$string['layouttemplate_twocolumns_desc'] = 'Text in two equal columns.';
+$string['layouttemplate_twocolumns_source'] = '# Title
+
+::: {.columns}
+::: {.column width="50%"}
+## Left
+
+Text
+:::
+::: {.column width="50%"}
+## Right
+
+Text
+:::
+:::
+';
+$string['layouttemplate_vocabulary'] = 'Vocabulary list';
+$string['layouttemplate_vocabulary_desc'] = 'Table with words, translations and examples.';
+$string['layouttemplate_vocabulary_source'] = '# Vocabulary
+
+| Word | Translation | Example |
+|---|---|---|
+| bonjour | hello | Bonjour, Marie ! |
+|  |  |  |
+|  |  |  |
+';
+$string['layouttemplate_worksheet'] = 'Worksheet';
+$string['layouttemplate_worksheet_desc'] = 'Title, tasks with instructions and writing lines.';
+$string['layouttemplate_worksheet_source'] = '# Worksheet
+
+Name: ______________________  Date: ____________
+
+::: {.callout-note}
+## Task 1
+Read the text and answer the questions.
+:::
+
+::: {.lines n=5}
+:::
+
+::: {.callout-note}
+## Task 2
+Describe the picture.
+:::
+
+::: {.columns}
+::: {.column width="40%"}
+![](ausschnitt-1.png)
+:::
+::: {.column width="60%"}
+::: {.lines n=6}
+:::
+:::
+:::
+';
 $string['linkspread'] = 'Link with next page';
 $string['mask_black'] = 'Blackout';
 $string['mask_white'] = 'Whiteout';
@@ -130,6 +268,7 @@ $string['maxpages_desc'] = 'Longer documents are truncated.';
 $string['modulename'] = 'Buchbinder';
 $string['modulename_help'] = 'Buchbinder turns PDFs, scans, Word files and web content into modular, interactive learning material: clean up scans, write on pages, add invisible audio triggers, glossary terms and solution masks, offer a text view for smartphones and print paper saving booklets.';
 $string['modulenameplural'] = 'Buchbinder documents';
+$string['newlayoutpage'] = 'New composed page';
 $string['nocitation'] = 'No citation shown';
 $string['nocolumnsfound'] = 'No multi column layout detected.';
 $string['noglossaries'] = 'There is no glossary in this course.';
@@ -212,6 +351,7 @@ $string['term'] = 'Term';
 $string['text'] = 'Text';
 $string['textcolor'] = 'Text colour';
 $string['textview'] = 'Text view';
+$string['tool_clip'] = 'Clip';
 $string['tool_select'] = 'Select';
 $string['toolbar'] = 'Document tools';
 $string['tools'] = 'Tools';
