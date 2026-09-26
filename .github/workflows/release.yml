@@ -104,21 +104,23 @@ jobs:
           echo "maturity=$(.github/scripts/release.sh field maturity)" >> "$GITHUB_OUTPUT"
           .github/scripts/release.sh notes > dist/notes.md
 
-      - name: Create GitHub release
-        if: github.event_name != 'release'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ needs.prepare.outputs.tag }}
-          name: Buchbinder ${{ needs.prepare.outputs.tag }}
-          body_path: dist/notes.md
-          files: ${{ steps.build.outputs.zip }}
-          prerelease: ${{ steps.build.outputs.maturity != 'MATURITY_STABLE' }}
-
-      - name: Attach ZIP to the release created in the web interface
-        if: github.event_name == 'release'
+      - name: Create the GitHub release or attach the ZIP to an existing one
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "${{ needs.prepare.outputs.tag }}" "${{ steps.build.outputs.zip }}" --clobber
+          TAG: ${{ needs.prepare.outputs.tag }}
+          ZIP: ${{ steps.build.outputs.zip }}
+          MATURITY: ${{ steps.build.outputs.maturity }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            # Created in the web interface (or by a parallel run): keep its title and text.
+            gh release upload "$TAG" "$ZIP" --clobber
+          else
+            PRERELEASE=""
+            if [ "$MATURITY" != "MATURITY_STABLE" ]; then
+              PRERELEASE="--prerelease"
+            fi
+            gh release create "$TAG" "$ZIP" --verify-tag --title "Buchbinder $TAG" --notes-file dist/notes.md $PRERELEASE
+          fi
 
       - name: Upload to moodle.org plugins directory (optional)
         env:

@@ -88,7 +88,8 @@ case "${1:-}" in
             echo "::error::CHANGES.md has no entries for [$release]" >&2
             exit 1
         fi
-        previous=$(git describe --tags --abbrev=0 "$tag^" 2>/dev/null || true)
+        # Only earlier version tags count (not "latest" or other free tags).
+        previous=$(git describe --tags --abbrev=0 --match 'v[0-9]*' "$tag^" 2>/dev/null || true)
         if [ -n "$previous" ]; then
             oldversion=$(git show "$previous:version.php" | sed -nE 's/^\$plugin->version\s*=\s*([0-9]+);.*/\1/p')
             if [ "$(field version)" -le "${oldversion:-0}" ]; then
