@@ -63,6 +63,13 @@ final class backup_test extends \advanced_testcase {
         $document->save_overlay($p1, 0, 'glossary', [0, 0, 0.1, 0.1], ['glossaryid' => $glossary->id, 'term' => 'x']);
         $audio = $document->save_overlay($p2, 0, 'audio', [0, 0, 0.1, 0.1], []);
         $document->save_audio($audio->id, 'a.mp3', 'ID3');
+        // A Markdown source with an image waits in the import area.
+        $staging = new importer($document, ['stage']);
+        $mdsource = $document->add_source('md', ['title' => 'Entwurf']);
+        $staging->flow(local\blocks::from_html(
+            '<p>Absatz</p><p><img src="b.png" alt="B"></p>',
+            fn($src) => ['data' => local\image_cleanup::to_png($img), 'filename' => 'b.png']
+        ), $mdsource);
         return [$course, $glossary, get_coursemodule_from_id('buchbinder', $instance->cmid)];
     }
 
@@ -103,6 +110,16 @@ final class backup_test extends \advanced_testcase {
             '/',
             'a.mp3'
         )->get_content());
+
+        // The import area keeps its pages, passages and their images.
+        $staged = $document->get_staged_pages();
+        $this->assertCount(1, $staged);
+        $source = $document->get_source((int)reset($staged)->sourceid);
+        $this->assertSame('Entwurf', $source->title);
+        $this->assertSame([(int)array_key_first($staged)], array_map('intval', array_keys(json_decode($source->flowmap, true))));
+        $blocks = $document->get_source_blocks((int)$source->id);
+        $this->assertCount(2, $blocks);
+        $this->assertNotSame('', $blocks[1]['data']);
     }
 
     public function test_duplicate_activity(): void {

@@ -41,6 +41,12 @@
         <FIELD NAME="timeaccessed" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
         <FIELD NAME="showcitation" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="1" SEQUENCE="false"/>
         <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="blocks" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="Passages of continuous sources (JSON), images in the sourcemedia file area"/>
+        <FIELD NAME="hiddenblocks" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="Indexes of hidden passages (JSON)"/>
+        <FIELD NAME="flowmap" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="Passages placed on each page of the import area (JSON pageid => indexes)"/>
+        <FIELD NAME="pagestyle" TYPE="char" LENGTH="20" NOTNULL="false" SEQUENCE="false" COMMENT="Layout template for continuous sources"/>
+        <FIELD NAME="startright" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="measurekey" TYPE="char" LENGTH="64" NOTNULL="false" SEQUENCE="false" COMMENT="Fonts and settings of the last text measurement in the browser"/>
       </FIELDS>
       <KEYS>
         <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
@@ -64,6 +70,8 @@
         <FIELD NAME="pinside" TYPE="char" LENGTH="5" NOTNULL="false" SEQUENCE="false" COMMENT="Intended side (left/right), kept by blank filler pages"/>
         <FIELD NAME="filler" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Blank page inserted automatically to keep sides"/>
         <FIELD NAME="pagestyle" TYPE="char" LENGTH="20" NOTNULL="false" SEQUENCE="false" COMMENT="Layout template of the page (e.g. tufte)"/>
+        <FIELD NAME="staged" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Page is in the import area and not yet part of the document"/>
+        <FIELD NAME="layoutside" TYPE="char" LENGTH="5" NOTNULL="false" SEQUENCE="false" COMMENT="Side the frames were set for; frames are mirrored when the page changes side"/>
         <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
       </FIELDS>
       <KEYS>

@@ -33,7 +33,8 @@ class importer {
 
     /**
      * @var array options: chop, deskew, shadow, split (scans), startright (documents start on a right page),
-     *      tufte (documents are set in the Tufte page style instead of keeping their formatting)
+     *      tufte (documents are set in the Tufte page style instead of keeping their formatting),
+     *      stage (pages go into the import area instead of the document)
      */
     protected $ops;
 
@@ -64,6 +65,31 @@ class importer {
      * @return int number of created pages
      */
     public function import_file(\stored_file $file, array $meta = []): int {
+        $this->document->set_staging($this->is_staging());
+        try {
+            return $this->import_file_now($file, $meta);
+        } finally {
+            $this->document->set_staging(false);
+        }
+    }
+
+    /**
+     * Whether pages go into the import area.
+     *
+     * @return bool
+     */
+    public function is_staging(): bool {
+        return in_array('stage', $this->ops);
+    }
+
+    /**
+     * Import an uploaded file (see import_file()).
+     *
+     * @param \stored_file $file
+     * @param array $meta
+     * @return int
+     */
+    protected function import_file_now(\stored_file $file, array $meta): int {
         \core_php_time_limit::raise(600);
         raise_memory_limit(MEMORY_HUGE);
 
@@ -229,8 +255,63 @@ class importer {
      * @return int number of pages created
      */
     public function flow(array $blocks, ?int $sourceid): int {
+        return count($this->flow_pages($blocks, $sourceid));
+    }
+
+    /**
+     * Place blocks as frames on new pages.
+     *
+     * In the import area, the passages are kept with the source, so they can be hidden and set again.
+     *
+     * @param array $blocks
+     * @param int|null $sourceid
+     * @return \stdClass[] created pages
+     */
+    protected function flow_pages(array $blocks, ?int $sourceid): array {
+        global $DB;
+        if ($sourceid && $this->is_staging()) {
+            $this->document->save_source_blocks($sourceid, $blocks);
+            $DB->update_record('buchbinder_source', (object)['id' => $sourceid, 'pagestyle' => $this->style(),
+                'startright' => (int)in_array('startright', $this->ops), 'hiddenblocks' => null, 'measurekey' => null]);
+            return self::set_source($this->document, $sourceid);
+        }
         $flow = new flow($this->document, $sourceid, $this->style());
-        return count($flow->run($blocks, in_array('startright', $this->ops)));
+        return $flow->run($blocks, in_array('startright', $this->ops));
+    }
+
+    /**
+     * Set the passages of a continuous source again on pages of the import area.
+     *
+     * Hidden passages and passages already taken into the document are left out.
+     *
+     * @param document $document
+     * @param int $sourceid
+     * @param array|null $measure text heights measured in the browser, see flow::set_measure()
+     * @param string|null $measurekey fonts and settings of the measurement
+     * @return \stdClass[] created pages
+     */
+    public static function set_source(
+        document $document,
+        int $sourceid,
+        ?array $measure = null,
+        ?string $measurekey = null
+    ): array {
+        global $DB;
+        $source = $document->get_source($sourceid);
+        $document->delete_staged_pages($sourceid);
+        $hidden = array_map('intval', json_decode((string)$source->hiddenblocks, true) ?: []);
+        $blocks = array_values(array_filter(
+            $document->get_source_blocks($sourceid),
+            fn($b) => !in_array($b['index'], $hidden, true) && empty($b['adopted'])
+                && ($b['type'] !== 'image' || $b['data'] !== '')
+        ));
+        $flow = new flow($document, $sourceid, $source->pagestyle ?: booklet::STYLE_STANDARD);
+        $flow->set_staged(true);
+        $flow->set_measure($measure ?? []);
+        $pages = $flow->run($blocks, (bool)$source->startright);
+        $DB->update_record('buchbinder_source', (object)['id' => $sourceid, 'flowmap' => json_encode($flow->get_pagemap()),
+            'measurekey' => $measure ? $measurekey : null]);
+        return $pages;
     }
 
     /**
@@ -339,6 +420,23 @@ class importer {
      * @return int
      */
     public function add_blank_pages(string $template, int $count, bool $landscape): int {
+        $this->document->set_staging($this->is_staging());
+        try {
+            return $this->add_blank_pages_now($template, $count, $landscape);
+        } finally {
+            $this->document->set_staging(false);
+        }
+    }
+
+    /**
+     * Add blank worksheet pages (see add_blank_pages()).
+     *
+     * @param string $template
+     * @param int $count
+     * @param bool $landscape
+     * @return int
+     */
+    protected function add_blank_pages_now(string $template, int $count, bool $landscape): int {
         $template = in_array($template, blank_page::TEMPLATES) ? $template : 'blank';
         $sourceid = $this->document->add_source('blank', [
             'title' => get_string('template_' . $template, 'mod_buchbinder'),
@@ -371,8 +469,12 @@ class importer {
             $name = rawurldecode(preg_replace('#^@@PLUGINFILE@@/#', '', $src));
             return isset($images[$name]) ? ['data' => $images[$name], 'filename' => $name] : null;
         };
-        $flow = new flow($this->document, $sourceid, $this->style());
-        $pages = $flow->run(blocks::from_html($html, $resolver, $this->has_notes()), in_array('startright', $this->ops));
-        return $pages[0] ?? $this->document->add_canvas_page(null, ['sourceid' => $sourceid]);
+        $this->document->set_staging($this->is_staging());
+        try {
+            $pages = $this->flow_pages(blocks::from_html($html, $resolver, $this->has_notes()), $sourceid);
+            return $pages[0] ?? $this->document->add_canvas_page(null, ['sourceid' => $sourceid]);
+        } finally {
+            $this->document->set_staging(false);
+        }
     }
 }

@@ -93,6 +93,21 @@ class flow {
     /** @var int Images up to this width (px) become margin figures in the Tufte style. */
     const MARGIN_FIGURE_MAX_WIDTH = 450;
 
+    /** @var bool create the pages in the import area */
+    protected $staged = false;
+
+    /** @var array measured text heights by block index (see set_measure()) */
+    protected $measure = [];
+
+    /** @var int position in the booklet of the next page */
+    protected $position = 1;
+
+    /** @var int|null index of the block being placed */
+    protected $blockindex = null;
+
+    /** @var array page id => block indexes placed on the page */
+    protected $pagemap = [];
+
     /**
      * Constructor.
      *
@@ -110,6 +125,39 @@ class flow {
     }
 
     /**
+     * Create the pages in the import area instead of the document.
+     *
+     * The pages are set for the sides they would get at the end of the document; if they land on other
+     * sides later, the document mirrors their frames.
+     *
+     * @param bool $staged
+     */
+    public function set_staged(bool $staged): void {
+        $this->staged = $staged;
+    }
+
+    /**
+     * Use text heights measured in the browser (Pretext) instead of estimates.
+     *
+     * Heights are relative to the page height. For paragraphs, 'lines' holds the number of characters
+     * of the block text up to the end of each line, so paragraphs can be split exactly at a line.
+     *
+     * @param array $measure block index => ['h' => float, 'lh' => float, 'lines' => int[], 'notes' => float[]]
+     */
+    public function set_measure(array $measure): void {
+        $this->measure = $measure;
+    }
+
+    /**
+     * Block indexes placed on each created page.
+     *
+     * @return array page id => int[]
+     */
+    public function get_pagemap(): array {
+        return $this->pagemap;
+    }
+
+    /**
      * Place blocks on new pages at the end of the document.
      *
      * @param array $blocks see blocks
@@ -117,17 +165,22 @@ class flow {
      * @return \stdClass[] created pages (without blank padding pages)
      */
     public function run(array $blocks, bool $startright = false): array {
-        if ($startright && $this->document->side_at(count($this->document->get_pages()) + 1) !== booklet::RIGHT) {
+        $this->position = count($this->document->get_pages()) + 1;
+        if ($startright && $this->document->side_at($this->position) !== booklet::RIGHT) {
             // Frames are placed in the mirrored type area, so the side must be known in advance.
-            $this->document->add_canvas_page(null, ['filler' => 1]);
+            if (!$this->staged) {
+                $this->document->add_canvas_page(null, ['filler' => 1]);
+            }
+            $this->position++;
         }
-        foreach ($blocks as $block) {
+        foreach ($blocks as $i => $block) {
+            $this->blockindex = $block['index'] ?? $i;
             if ($block['type'] === 'pagebreak') {
                 $this->breakpending = $this->page !== null;
             } else if ($block['type'] === 'image') {
                 $this->place_image($block);
             } else {
-                $this->place_text($block['tag'], $block['html'], $block['notes'] ?? []);
+                $this->place_text($block['tag'], $block['html'], $block['notes'] ?? [], $this->measure[$this->blockindex] ?? null);
             }
         }
         $this->flush();
@@ -211,11 +264,11 @@ class flow {
      */
     protected function new_page(): void {
         $this->flush();
+        $side = $this->document->side_at($this->position++);
         $this->page = $this->document->add_canvas_page(null, ['sourceid' => $this->sourceid,
-            'pagestyle' => $this->style === booklet::STYLE_STANDARD ? null : $this->style]);
+            'pagestyle' => $this->style === booklet::STYLE_STANDARD ? null : $this->style,
+            'staged' => (int)$this->staged, 'layoutside' => $side]);
         $this->pages[] = $this->page;
-        $position = count($this->document->get_pages());
-        $side = $this->document->side_at($position);
         $this->area = booklet::type_area($side, $this->style);
         $this->y = $this->area[1];
         $this->breakpending = false;
@@ -229,11 +282,24 @@ class flow {
     }
 
     /**
+     * Remember that the current block has content on the current page.
+     */
+    protected function touch(): void {
+        if ($this->page !== null && $this->blockindex !== null) {
+            $id = (int)$this->page->id;
+            if (!in_array($this->blockindex, $this->pagemap[$id] ?? [], true)) {
+                $this->pagemap[$id][] = $this->blockindex;
+            }
+        }
+    }
+
+    /**
      * Place notes in the note column next to the current line.
      *
      * @param string[] $notes html
+     * @param float[] $heights measured heights of the notes (relative to the page height)
      */
-    protected function place_notes(array $notes): void {
+    protected function place_notes(array $notes, array $heights = []): void {
         if (!$notes) {
             return;
         }
@@ -242,7 +308,8 @@ class flow {
         }
         $bottom = $this->notearea[1] + $this->notearea[3];
         foreach ($notes as $i => $html) {
-            $height = self::estimate('p', $html, $this->notearea[2] / self::NOTE_SCALE * $this->textfactor) * self::NOTE_SCALE;
+            $height = isset($heights[$i]) ? (float)$heights[$i]
+                : self::estimate('p', $html, $this->notearea[2] / self::NOTE_SCALE * $this->textfactor) * self::NOTE_SCALE;
             $top = max($this->y, $this->notey);
             if ($top + $height > $bottom + 1e-9 && $top > $this->notearea[1] + 1e-9) {
                 // Continue in the note column of the next page.
@@ -256,6 +323,7 @@ class flow {
                 [$this->notearea[0], $top, $this->notearea[2], min($height, $bottom - $top)],
                 ['html' => $html, 'fontscale' => self::NOTE_SCALE, 'style' => 'sidenote']
             );
+            $this->touch();
             $this->notey = $top + $height + self::GAP_MM / 2 / booklet::PAGE_HEIGHT_MM;
         }
     }
@@ -288,17 +356,23 @@ class flow {
      * @param string $tag
      * @param string $html
      * @param string[] $notes notes referenced in the block (Tufte style: placed next to it)
+     * @param array|null $measure heights measured in the browser, see set_measure()
      */
-    protected function place_text(string $tag, string $html, array $notes = []): void {
+    protected function place_text(string $tag, string $html, array $notes = [], ?array $measure = null): void {
+        if ($measure !== null && !empty($measure['lines']) && !empty($measure['lh'])) {
+            $this->place_measured_text($tag, $html, $notes, $measure);
+            return;
+        }
+        $noteheights = $measure['notes'] ?? [];
         $guard = 0;
         while ($html !== '' && $guard++ < 200) {
             // Width for the estimates (the frame gets the width of the type area).
             $width = ($this->area[2] ?? booklet::type_area(booklet::RIGHT, $this->style)[2]) * $this->textfactor;
-            $height = self::estimate($tag, $html, $width);
+            $height = ($guard === 1 && isset($measure['h'])) ? (float)$measure['h'] : self::estimate($tag, $html, $width);
             // Keep headings with at least three lines of the following text.
             $needed = isset(self::HEADING_SCALE[$tag]) ? $height + 3 * self::line_height() : $height;
             if ($this->page !== null && !$this->breakpending && $this->y + $needed <= $this->bottom() + 1e-9) {
-                $this->place_notes($notes);
+                $this->place_notes($notes, $noteheights);
                 $this->add_to_chunk($html, $height);
                 return;
             }
@@ -310,7 +384,7 @@ class flow {
             if (!isset(self::HEADING_SCALE[$tag]) && $free >= 3 * self::line_height()) {
                 [$first, $rest] = self::split($tag, $html, $free, $width);
                 if ($first !== '') {
-                    $this->place_notes($notes);
+                    $this->place_notes($notes, $noteheights);
                     $notes = [];
                     $this->add_to_chunk($first, self::estimate($tag, $first, $width));
                     $html = $rest;
@@ -318,7 +392,61 @@ class flow {
             }
             if ($this->y <= $this->area[1] + 1e-9) {
                 // Even an empty page is too small: place it anyway, the frame can be adjusted in the studio.
-                $this->place_notes($notes);
+                $this->place_notes($notes, $noteheights);
+                $this->add_to_chunk($html, min($height, $this->area[3]));
+                return;
+            }
+            $this->new_page();
+        }
+    }
+
+    /**
+     * Place a text block with heights measured in the browser, splitting paragraphs exactly at a line.
+     *
+     * @param string $tag
+     * @param string $html
+     * @param string[] $notes
+     * @param array $measure see set_measure()
+     */
+    protected function place_measured_text(string $tag, string $html, array $notes, array $measure): void {
+        $lines = array_map('intval', $measure['lines']);
+        $lh = (float)$measure['lh'];
+        $extra = max(0.0, (float)$measure['h'] - count($lines) * $lh);
+        $noteheights = $measure['notes'] ?? [];
+        $heading = isset(self::HEADING_SCALE[$tag]);
+        $splittable = in_array($tag, ['p', 'blockquote']);
+        $bodyline = (float)($measure['blh'] ?? $lh);
+        $done = 0;
+        $guard = 0;
+        while ($html !== '' && $guard++ < 200) {
+            $remaining = count($lines) - $done;
+            $height = $remaining * $lh + $extra;
+            // Keep headings with at least three lines of the following text.
+            $needed = $heading ? $height + 3 * $bodyline : $height;
+            if ($this->page !== null && !$this->breakpending && $this->y + $needed <= $this->bottom() + 1e-9) {
+                $this->place_notes($notes, $noteheights);
+                $this->add_to_chunk($html, $height);
+                return;
+            }
+            if ($this->page === null || $this->breakpending) {
+                $this->new_page();
+                continue;
+            }
+            $fit = (int)floor(($this->bottom() - $this->y - $extra) / $lh + 1e-9);
+            // No single lines at the bottom or the top of a page.
+            if ($splittable && $fit >= 2 && $remaining - $fit >= 2) {
+                $offset = $done > 0 ? $lines[$done - 1] : 0;
+                [$first, $rest] = self::split_html_text($html, $lines[$done + $fit - 1] - $offset + 1);
+                if ($first !== '' && $rest !== '') {
+                    $this->place_notes($notes, $noteheights);
+                    $notes = [];
+                    $this->add_to_chunk($first, $fit * $lh + $extra);
+                    $html = $rest;
+                    $done += $fit;
+                }
+            }
+            if ($this->y <= $this->area[1] + 1e-9) {
+                $this->place_notes($notes, $noteheights);
                 $this->add_to_chunk($html, min($height, $this->area[3]));
                 return;
             }
@@ -338,6 +466,7 @@ class flow {
         }
         $this->chunk[] = $html;
         $this->y += $height;
+        $this->touch();
     }
 
     /**
@@ -391,6 +520,7 @@ class flow {
             ['alt' => $block['alt'], 'caption' => $block['caption']]
         );
         $this->document->save_frame_image((int)$frame->id, $block['filename'], $block['data']);
+        $this->touch();
         $this->y += $height + self::GAP_MM / booklet::PAGE_HEIGHT_MM;
         if ($block['caption'] !== '') {
             $this->place_text('p', '<p class="bb-caption"><em>' . s($block['caption']) . '</em></p>');
@@ -423,6 +553,7 @@ class flow {
             ['alt' => $block['alt'], 'caption' => $block['caption']]
         );
         $this->document->save_frame_image((int)$frame->id, $block['filename'], $block['data']);
+        $this->touch();
         $this->notey = $top + $height + self::GAP_MM / 2 / booklet::PAGE_HEIGHT_MM;
         if ($block['caption'] !== '') {
             $this->place_notes(['<p><em>' . s($block['caption']) . '</em></p>']);

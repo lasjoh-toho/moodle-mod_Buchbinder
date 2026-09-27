@@ -231,8 +231,11 @@ echo $OUTPUT->render_from_template('mod_buchbinder/desk', [
     'addpageurl' => $act('addpage', 0),
     'prevurl' => $current > 0 ? $panel[$current - 1]['url'] : '',
     'nexturl' => isset($panel[$current + 1]) ? $panel[$current + 1]['url'] : '',
+    'isdesk' => true,
+    'zoom' => true,
     'links' => [
-        'import' => $studio('import'),
+        'import' => (new moodle_url('/mod/buchbinder/import.php', ['id' => $cm->id]))->out(false),
+        'desk' => $baseurl->out(false),
         'pages' => $studio('pages'),
         'sources' => $studio('sources'),
         'publish' => $studio('publish'),

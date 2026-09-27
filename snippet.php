@@ -87,9 +87,9 @@ if ($form->is_cancelled()) {
         foreach (get_file_storage()->get_area_files($context->id, 'mod_buchbinder', 'source', $sourceid, 'id', false) as $f) {
             $images[$f->get_filename()] = $f->get_content();
         }
-        $firstpage = (new importer($document))->add_snippet('clipboard', $formdata->content, $images, [], $sourceid);
+        (new importer($document, ['stage']))->add_snippet('clipboard', $formdata->content, $images, [], $sourceid);
         redirect(
-            new moodle_url('/mod/buchbinder/desk.php', ['id' => $cm->id, 'pageid' => $firstpage->id]),
+            new moodle_url('/mod/buchbinder/import.php', ['id' => $cm->id, 'sourceid' => $sourceid]),
             get_string('changessaved')
         );
     }

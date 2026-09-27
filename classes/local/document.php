@@ -44,6 +44,9 @@ class document {
     /** @var stdClass */
     protected $instance;
 
+    /** @var bool new pages go into the import area */
+    protected $staging = false;
+
     /** @var context_module */
     protected $context;
 
@@ -98,7 +101,169 @@ class document {
      */
     public function get_pages(): array {
         global $DB;
-        return $DB->get_records('buchbinder_page', ['buchbinderid' => $this->instance->id], 'sortorder ASC, id ASC');
+        return $DB->get_records(
+            'buchbinder_page',
+            ['buchbinderid' => $this->instance->id, 'staged' => 0],
+            'sortorder ASC, id ASC'
+        );
+    }
+
+    /**
+     * Pages in the import area (imported, not yet taken into the document).
+     *
+     * @param int|null $sourceid only pages of this source
+     * @return stdClass[] keyed by id, in import order
+     */
+    public function get_staged_pages(?int $sourceid = null): array {
+        global $DB;
+        $conditions = ['buchbinderid' => $this->instance->id, 'staged' => 1];
+        if ($sourceid !== null) {
+            $conditions['sourceid'] = $sourceid;
+        }
+        return $DB->get_records('buchbinder_page', $conditions, 'sortorder ASC, id ASC');
+    }
+
+    /**
+     * Take pages of the import area into the document.
+     *
+     * The pages keep their order, chains and pins; automatic blank pages and mirrored frames
+     * keep the booklet layout. Chains to pages that stay in the import area are removed.
+     *
+     * @param int[] $pageids staged pages
+     * @param int|null $afterpageid insert after this document page, null: at the end, 0: at the beginning
+     * @return int number of pages taken over
+     */
+    public function adopt_pages(array $pageids, ?int $afterpageid = null): int {
+        global $DB;
+        $staged = $this->get_staged_pages();
+        $adopt = array_values(array_filter($staged, fn($p) => in_array((int)$p->id, array_map('intval', $pageids), true)));
+        if (!$adopt) {
+            return 0;
+        }
+        $ids = array_map(fn($p) => (int)$p->id, $adopt);
+        $order = [];
+        $inserted = false;
+        if ($afterpageid === 0) {
+            $order = $ids;
+            $inserted = true;
+        }
+        foreach ($this->get_pages() as $page) {
+            $order[] = (int)$page->id;
+            if ($afterpageid && (int)$page->id === $afterpageid) {
+                $order = array_merge($order, $ids);
+                $inserted = true;
+            }
+        }
+        if (!$inserted) {
+            $order = array_merge($order, $ids);
+        }
+        $transaction = $DB->start_delegated_transaction();
+        foreach ($adopt as $page) {
+            $DB->set_field('buchbinder_page', 'staged', 0, ['id' => $page->id]);
+            if ($page->spreadid) {
+                $partners = array_filter($staged, fn($p) => $p->spreadid == $page->spreadid && $p->id != $page->id);
+                foreach ($partners as $partner) {
+                    if (!in_array((int)$partner->id, $ids, true)) {
+                        $this->unlink_spread_by_id((int)$page->spreadid);
+                    }
+                }
+            }
+        }
+        foreach ($order as $i => $id) {
+            $DB->set_field('buchbinder_page', 'sortorder', $i + 1, ['id' => $id]);
+        }
+        $transaction->allow_commit();
+        $this->mark_adopted_passages($adopt);
+        $this->rebalance();
+        return count($adopt);
+    }
+
+    /**
+     * Remember which passages of continuous sources are now part of the document.
+     *
+     * Passages that lie completely on taken over pages are left out when the import area is set again.
+     *
+     * @param stdClass[] $adopted
+     */
+    protected function mark_adopted_passages(array $adopted): void {
+        global $DB;
+        foreach (array_unique(array_filter(array_map(fn($p) => (int)$p->sourceid, $adopted))) as $sourceid) {
+            $source = $DB->get_record('buchbinder_source', ['id' => $sourceid]);
+            $map = $source && $source->flowmap ? json_decode($source->flowmap, true) : [];
+            if (!$map) {
+                continue;
+            }
+            $adoptedids = array_map(fn($p) => (int)$p->id, $adopted);
+            $onadopted = [];
+            $onstaged = [];
+            foreach ($map as $pageid => $indexes) {
+                foreach ($indexes as $index) {
+                    if (in_array((int)$pageid, $adoptedids, true)) {
+                        $onadopted[$index] = true;
+                    } else {
+                        $onstaged[$index] = true;
+                    }
+                }
+                if (in_array((int)$pageid, $adoptedids, true)) {
+                    unset($map[$pageid]);
+                }
+            }
+            $blocks = json_decode((string)$source->blocks, true) ?: [];
+            foreach (array_keys(array_diff_key($onadopted, $onstaged)) as $index) {
+                if (isset($blocks[$index])) {
+                    $blocks[$index]['adopted'] = true;
+                }
+            }
+            $DB->update_record('buchbinder_source', (object)['id' => $sourceid, 'flowmap' => json_encode($map),
+                'blocks' => json_encode($blocks)]);
+        }
+    }
+
+    /**
+     * Split a page into a left and a right half (scanned double page).
+     *
+     * The gutter is detected; if there is none, the page is cut in the middle. The halves are chained.
+     *
+     * @param int $pageid
+     * @return bool whether the page was split
+     */
+    public function split_page(int $pageid): bool {
+        $page = $this->get_page($pageid);
+        if ($page->pagetype !== 'image' || $page->spreadid) {
+            return false;
+        }
+        $img = $this->load_page_image($page);
+        if (!$img) {
+            return false;
+        }
+        $gutter = image_cleanup::find_gutter($img) ?? (int)round(imagesx($img) / 2);
+        [$left, $right] = image_cleanup::split($img, $gutter);
+        global $DB;
+        $DB->update_record('buchbinder_page', (object)['id' => $page->id, 'spreadid' => $page->id, 'spreadside' => 'left',
+            'landscapelock' => 0, 'pinside' => null]);
+        $page = $this->get_page($page->id);
+        $this->store_page_image($page, $left);
+        $right = $this->add_image_page($right, $page->sourceid, ['spreadid' => $page->id, 'spreadside' => 'right',
+            'staged' => (int)$page->staged], $page->id);
+        $this->delete_overlays_of_page($page->id);
+        if (!$page->staged) {
+            $this->rebalance();
+        }
+        return true;
+    }
+
+    /**
+     * Remove the pages of a source from the import area.
+     *
+     * @param int $sourceid
+     * @return int number of removed pages
+     */
+    public function delete_staged_pages(int $sourceid): int {
+        $pages = $this->get_staged_pages($sourceid);
+        foreach ($pages as $page) {
+            $this->delete_page((int)$page->id, false);
+        }
+        return count($pages);
     }
 
     /**
@@ -167,6 +332,8 @@ class document {
             'pinside' => null,
             'filler' => 0,
             'pagestyle' => null,
+            'staged' => (int)$this->staging,
+            'layoutside' => null,
             'timemodified' => time(),
         ], $fields);
         if ($afterpageid) {
@@ -622,7 +789,11 @@ class document {
      */
     public function link_spread(int $pageid): void {
         global $DB;
-        $pages = array_values(array_filter($this->get_pages(), fn($p) => !$p->filler));
+        $current = $this->get_page($pageid);
+        // Pages of the import area are chained within their source.
+        $set = $current->staged ? $this->get_staged_pages($current->sourceid ? (int)$current->sourceid : null)
+            : $this->get_pages();
+        $pages = array_values(array_filter($set, fn($p) => !$p->filler));
         foreach ($pages as $i => $page) {
             if ($page->id == $pageid && isset($pages[$i + 1]) && !$page->spreadid && !$pages[$i + 1]->spreadid) {
                 // Pins do not apply to double pages: the chain decides the sides.
@@ -727,7 +898,40 @@ class document {
             $sortorder++;
         }
         $transaction->allow_commit();
+        $this->mirror_changed_pages();
         return count($order) - $before;
+    }
+
+    /**
+     * Mirror the frames of pages that were set for the other side of the double page.
+     *
+     * Frames placed by the layout flow sit in the mirrored type area (wide margins outside). When such
+     * a page moves from a left to a right page (or back), its frames are mirrored so the margins stay outside.
+     */
+    protected function mirror_changed_pages(): void {
+        global $DB;
+        $firstright = $this->first_page_right();
+        $position = 1;
+        foreach ($this->get_pages() as $page) {
+            $side = booklet::side($position++, $firstright);
+            if (!$page->layoutside || $page->layoutside === $side) {
+                continue;
+            }
+            $this->mirror_frames((int)$page->id);
+            $DB->set_field('buchbinder_page', 'layoutside', $side, ['id' => $page->id]);
+        }
+    }
+
+    /**
+     * Mirror all overlays of a page horizontally.
+     *
+     * @param int $pageid
+     */
+    public function mirror_frames(int $pageid): void {
+        global $DB;
+        foreach ($DB->get_records('buchbinder_overlay', ['pageid' => $pageid]) as $overlay) {
+            $DB->set_field('buchbinder_overlay', 'x', max(0, 1 - $overlay->x - $overlay->w), ['id' => $overlay->id]);
+        }
     }
 
     /**
@@ -1215,6 +1419,74 @@ class document {
     }
 
     /**
+     * New pages go into the import area (while importing).
+     *
+     * @param bool $staging
+     */
+    public function set_staging(bool $staging): void {
+        $this->staging = $staging;
+    }
+
+    /**
+     * Load a source of this document.
+     *
+     * @param int $sourceid
+     * @return stdClass
+     */
+    public function get_source(int $sourceid): stdClass {
+        global $DB;
+        return $DB->get_record('buchbinder_source', ['id' => $sourceid, 'buchbinderid' => $this->instance->id], '*', MUST_EXIST);
+    }
+
+    /**
+     * Keep the passages of a continuous source (Word, HTML, Markdown, web) for setting it again.
+     *
+     * Image data is stored in the sourcemedia file area.
+     *
+     * @param int $sourceid
+     * @param array $blocks see blocks
+     */
+    public function save_source_blocks(int $sourceid, array $blocks): void {
+        global $DB;
+        $fs = get_file_storage();
+        $fs->delete_area_files($this->context->id, 'mod_buchbinder', 'sourcemedia', $sourceid);
+        $stored = [];
+        foreach (array_values($blocks) as $i => $block) {
+            if ($block['type'] === 'image') {
+                $name = $i . '-' . clean_param($block['filename'] ?: 'image.png', PARAM_FILE);
+                $fs->create_file_from_string(['contextid' => $this->context->id, 'component' => 'mod_buchbinder',
+                    'filearea' => 'sourcemedia', 'itemid' => $sourceid, 'filepath' => '/', 'filename' => $name], $block['data']);
+                unset($block['data']);
+                $block['file'] = $name;
+            }
+            $stored[] = $block;
+        }
+        $DB->set_field('buchbinder_source', 'blocks', json_encode($stored), ['id' => $sourceid]);
+    }
+
+    /**
+     * Passages of a continuous source.
+     *
+     * @param int $sourceid
+     * @param bool $withdata load the image data
+     * @return array blocks with 'index' (position in the source) and 'adopted' (already in the document)
+     */
+    public function get_source_blocks(int $sourceid, bool $withdata = true): array {
+        $source = $this->get_source($sourceid);
+        $blocks = json_decode((string)$source->blocks, true) ?: [];
+        $fs = get_file_storage();
+        foreach ($blocks as $i => &$block) {
+            $block['index'] = $i;
+            if ($block['type'] === 'image' && $withdata) {
+                $file = $fs->get_file($this->context->id, 'mod_buchbinder', 'sourcemedia', $sourceid, '/', $block['file'] ?? '');
+                $block['data'] = $file ? $file->get_content() : '';
+                $block['filename'] = preg_replace('/^\d+-/', '', $block['file'] ?? 'image.png');
+            }
+        }
+        return $blocks;
+    }
+
+    /**
      * Sources of this document.
      *
      * @return stdClass[]
@@ -1262,14 +1534,18 @@ class document {
         );
         $count = 0;
         foreach (
-            $DB->get_fieldset_select(
+            $DB->get_records_select_menu(
                 'buchbinder_page',
-                'id',
                 'buchbinderid = ? AND sourceid = ?',
-                [$this->instance->id, $source->id]
-            ) as $pageid
+                [$this->instance->id, $source->id],
+                '',
+                'id, staged'
+            ) as $pageid => $staged
         ) {
-            if ($deletepages) {
+            if ($staged) {
+                // Pages still in the import area go with their source.
+                $this->delete_page((int)$pageid, false);
+            } else if ($deletepages) {
                 $this->delete_page((int)$pageid, false);
                 $count++;
             } else {
@@ -1277,6 +1553,7 @@ class document {
             }
         }
         get_file_storage()->delete_area_files($this->context->id, 'mod_buchbinder', 'source', $source->id);
+        get_file_storage()->delete_area_files($this->context->id, 'mod_buchbinder', 'sourcemedia', $source->id);
         $DB->delete_records('buchbinder_source', ['id' => $source->id]);
         if ($count) {
             $this->rebalance();

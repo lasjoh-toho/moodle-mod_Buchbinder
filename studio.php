@@ -23,9 +23,7 @@
  */
 
 use mod_buchbinder\local\document;
-use mod_buchbinder\local\harvester;
 use mod_buchbinder\local\import_queue;
-use mod_buchbinder\local\importer;
 
 require_once(__DIR__ . '/../../config.php');
 
@@ -49,6 +47,10 @@ $baseurl = new moodle_url('/mod/buchbinder/studio.php', ['id' => $cm->id]);
 if ($tab === 'canvas') {
     // The canvas is the full screen layout desk.
     redirect(new moodle_url('/mod/buchbinder/desk.php', ['id' => $cm->id, 'pageid' => $pageid]));
+}
+if ($tab === 'import' && $action === '') {
+    // Imports go through the full screen import desk.
+    redirect(new moodle_url('/mod/buchbinder/import.php', ['id' => $cm->id]));
 }
 $taburl = new moodle_url($baseurl, ['tab' => $tab]);
 
@@ -110,7 +112,6 @@ if ($action !== '') {
     redirect($return);
 }
 
-$maxbytes = document::max_bytes($context);
 $content = '';
 if (in_array($tab, ['import', 'pages'])) {
     $jobs = import_queue::export($document, new moodle_url($baseurl, ['action' => 'dismissjob', 'sesskey' => sesskey()]));
@@ -123,85 +124,6 @@ if (in_array($tab, ['import', 'pages'])) {
 }
 
 switch ($tab) {
-    case 'import':
-        $importform = new \mod_buchbinder\form\import_form(null, ['maxbytes' => $maxbytes]);
-        $blankform = new \mod_buchbinder\form\blank_form();
-        $webform = null;
-        if (harvester::is_enabled() && has_capability('mod/buchbinder:harvest', $context)) {
-            $webform = new \mod_buchbinder\form\web_form();
-        }
-        $form = optional_param('form', '', PARAM_ALPHA);
-
-        if ($form === 'blank' && ($data = $blankform->get_data())) {
-            $n = (new importer($document))->add_blank_pages($data->template, (int)$data->count, !empty($data->landscape));
-            redirect(new moodle_url($baseurl, ['tab' => 'pages']), get_string('pagesimported', 'mod_buchbinder', $n));
-        }
-        if ($form === 'web' && $webform && ($data = $webform->get_data())) {
-            try {
-                $result = harvester::harvest($data->url, $data->selector ?? '', $maxbytes);
-                $importer = new importer($document, [$data->pagestyle ?? 'standard']);
-                $page = $importer->add_snippet('web', $result['html'], $result['images'], [
-                    'title' => $result['title'], 'url' => $result['url'], 'author' => $data->author ?? '',
-                ]);
-                redirect(
-                    new moodle_url('/mod/buchbinder/desk.php', ['id' => $cm->id, 'pageid' => $page->id]),
-                    get_string('snippetharvested', 'mod_buchbinder')
-                );
-            } catch (moodle_exception $e) {
-                \core\notification::error($e->getMessage());
-            }
-        }
-        if ($form === '' && ($data = $importform->get_data())) {
-            $draftid = file_get_submitted_draft_itemid('files');
-            $fs = get_file_storage();
-            $usercontext = context_user::instance($USER->id);
-            $ops = array_keys(array_filter(['chop' => $data->chop, 'deskew' => $data->deskew, 'shadow' => $data->shadow,
-                'split' => $data->split, 'startright' => $data->startright,
-                'tufte' => ($data->pagestyle ?? '') === 'tufte']));
-            $files = $fs->get_area_files($usercontext->id, 'user', 'draft', $draftid, 'sortorder, filename', false);
-            $job = import_queue::enqueue($document, array_values($files), $ops, ['title' => $data->title,
-                'author' => $data->author, 'url' => $data->url ?: null]);
-            $fs->delete_area_files($usercontext->id, 'user', 'draft', $draftid);
-            if ($job->status === import_queue::STATUS_QUEUED) {
-                redirect(new moodle_url($baseurl, ['tab' => 'pages']), get_string('importqueued', 'mod_buchbinder'));
-            }
-            if ($job->message) {
-                \core\notification::error(nl2br(s($job->message)));
-            }
-            $total = $job->pagecount;
-            redirect(new moodle_url($baseurl, ['tab' => 'pages']), get_string('pagesimported', 'mod_buchbinder', $total));
-        }
-
-        foreach ([$importform, $blankform, $webform] as $f) {
-            if ($f) {
-                $f->set_data(['id' => $cm->id]);
-                $content .= $f->render();
-            }
-        }
-        $content .= html_writer::div(
-            html_writer::link(
-                new moodle_url('/mod/buchbinder/layout.php', ['id' => $cm->id]),
-                get_string('newlayoutpage', 'mod_buchbinder'),
-                ['class' => 'btn btn-primary mr-2 me-2']
-            ) .
-            html_writer::link(
-                new moodle_url('/mod/buchbinder/snippet.php', ['id' => $cm->id]),
-                get_string('clipboardsnippet', 'mod_buchbinder'),
-                ['class' => 'btn btn-secondary mr-2 me-2']
-            ) .
-            (has_capability('mod/buchbinder:useassetbank', $context) ?
-                html_writer::link(
-                    new moodle_url('/mod/buchbinder/assetbank.php', ['id' => $cm->id]),
-                    get_string('assetbank', 'mod_buchbinder'),
-                    ['class' => 'btn btn-secondary']
-                ) : ''),
-            'my-3'
-        );
-        if (!harvester::is_enabled()) {
-            $content .= html_writer::div(get_string('harvesterdisabled', 'mod_buchbinder'), 'text-muted small');
-        }
-        break;
-
     case 'pages':
         $pages = array_values($document->get_pages());
         $sources = $document->get_sources();

@@ -5,6 +5,24 @@ neuen Version (siehe README, „Release erstellen“).
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-09-27
+
+- Importtisch (`import.php`) als Vollbild-Arbeitsplatz: Importe landen zuerst im Importbereich und
+  erscheinen als Miniaturen in Doppelseiten; ein Seitenbereich (z. B. `1-3, 5` oder per Häkchen) wird an
+  eine wählbare Stelle des Dokuments übernommen
+- Im Importtisch per Rechtsklick: Seiten teilen (Scan-Doppelseiten), verketten und als linke oder rechte
+  Seite festlegen; automatische Leerseiten werden in der Vorschau angezeigt
+- Fortlaufende Quellen (Word, HTML, Markdown, Web, Zwischenablage): Klick auf eine Miniatur zeigt die
+  Passagen der Seite, einzelne Passagen lassen sich ausblenden; Formatvorlage und „rechts beginnen“
+  sind nachträglich umstellbar
+- Seitenumfang wird im Browser mit Pretext exakt gemessen; Absätze werden genau an Zeilenenden umbrochen
+- Rahmen werden gespiegelt, wenn eine gesetzte Seite beim Übernehmen oder Verschieben die Seite wechselt,
+  sodass breite Ränder und Notizen außen bleiben
+- Satzstudio mit Editorleiste wie in einer Textverarbeitung: Formatvorlagen (Normaler Text, Titel,
+  Überschrift 1–3, Zitat, Code), fett, kursiv, unterstrichen, durchgestrichen, Text- und Markierungsfarbe,
+  Link, Ausrichtung, Listen, Einzug, Formatierung löschen, Rahmenstil und Schriftgröße in pt,
+  Rückgängig/Wiederholen
+
 ## [0.6.0] - 2026-09-26
 
 - Seitenpalette mit Kontextmenü (Rechtsklick oder Kontextmenü-Taste): Seiten mit der Folgeseite

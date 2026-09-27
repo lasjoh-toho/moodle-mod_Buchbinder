@@ -590,6 +590,11 @@
     margin: 0 0 .6em;
 }
 
+.path-mod-buchbinder .bb-textframe ul,
+.path-mod-buchbinder .bb-textframe ol {
+    padding-left: 1.5em;
+}
+
 .path-mod-buchbinder .bb-textframe h1,
 .path-mod-buchbinder .bb-textframe h2,
 .path-mod-buchbinder .bb-textframe h3,
@@ -689,7 +694,8 @@
     overflow: hidden;
 }
 
-.mod-buchbinder-editor.bb-desk {
+.mod-buchbinder-editor.bb-desk,
+.bb-desk.bb-importdesk {
     --bb-desk-zoom: 1;
     position: fixed;
     top: 0;
@@ -1229,4 +1235,454 @@
     .bb-desk .bb-desk-panel.dock-left {
         left: 170px;
     }
+}
+
+/* Import desk: imported material in the import area. */
+.bb-desk .bb-desk-menu a.active {
+    color: #fff;
+    box-shadow: inset 0 -2px 0 #4dabf7;
+}
+
+.bb-importdesk .bb-import-main {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 250px minmax(0, 1fr);
+    position: relative;
+}
+
+.bb-importdesk .bb-import-sources {
+    overflow-y: auto;
+    padding: .6rem;
+    background: #2c3035;
+    border-right: 1px solid #1c1e21;
+}
+
+.bb-importdesk .bb-import-more {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .2rem .8rem;
+    margin-bottom: .6rem;
+    font-size: 12px;
+}
+
+.bb-importdesk .bb-import-more a,
+.bb-importdesk .bb-import-sourcelist a {
+    color: #cfd4da;
+}
+
+.bb-importdesk .bb-jobs {
+    color: #212529;
+    font-size: 12px;
+}
+
+.bb-importdesk .bb-import-sourcelist {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.bb-importdesk .bb-import-sourcelist a {
+    display: block;
+    padding: .4rem .5rem;
+    border-left: 3px solid transparent;
+    text-decoration: none;
+}
+
+.bb-importdesk .bb-import-sourcelist a:hover,
+.bb-importdesk .bb-import-sourcelist a:focus {
+    background: rgba(255, 255, 255, .06);
+}
+
+.bb-importdesk .bb-import-sourcelist a.current {
+    border-left-color: #4dabf7;
+    background: rgba(77, 171, 247, .12);
+    color: #fff;
+}
+
+.bb-importdesk .bb-import-sourcetitle {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.bb-importdesk .bb-import-sourcemeta {
+    display: block;
+    color: #adb5bd;
+    font-size: 11px;
+}
+
+.bb-importdesk .bb-import-work {
+    overflow: auto;
+    padding: 0 1.5rem 2rem;
+    background: #5c636a;
+}
+
+.bb-importdesk .bb-import-head {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    margin: 0 -1.5rem;
+    padding: .6rem 1.5rem;
+    background: #3b4046;
+    border-bottom: 1px solid #24272b;
+}
+
+.bb-importdesk .bb-import-headtitle {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .6rem;
+}
+
+.bb-importdesk .bb-import-headtitle h2 {
+    margin: 0;
+    font-size: 1.2rem;
+    color: #fff;
+}
+
+.bb-importdesk .bb-import-delete {
+    margin-left: auto;
+    color: #ffa8a8;
+    font-size: 12px;
+}
+
+.bb-importdesk .bb-import-citation {
+    font-size: 12px;
+    color: #ced4da;
+}
+
+.bb-importdesk .bb-import-citation a {
+    color: #a5d8ff;
+}
+
+.bb-importdesk .bb-import-options,
+.bb-importdesk .bb-import-restyle,
+.bb-importdesk .bb-import-adopt {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .5rem 1rem;
+}
+
+.bb-importdesk .bb-import-options {
+    margin-top: .4rem;
+}
+
+.bb-importdesk .bb-import-restyle label {
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    margin: 0;
+}
+
+.bb-importdesk .bb-import-restyle select {
+    width: auto;
+}
+
+.bb-importdesk .bb-import-adopt {
+    position: sticky;
+    top: 0;
+    margin: .8rem 0 1rem;
+    padding: .5rem .75rem;
+    background: #2c3035;
+    border-radius: 4px;
+}
+
+.bb-importdesk .bb-import-adopt label {
+    margin: 0;
+}
+
+.bb-importdesk .bb-import-adopt .form-control,
+.bb-importdesk .bb-import-adopt select {
+    width: auto;
+}
+
+.bb-importdesk .bb-import-adopt .btn-link {
+    color: #a5d8ff;
+}
+
+.bb-importdesk .bb-import-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.25rem 2rem;
+}
+
+.bb-importdesk .bb-import-row {
+    position: relative;
+    display: flex;
+    width: 300px;
+}
+
+.bb-importdesk .bb-import-row.single-right {
+    justify-content: flex-end;
+}
+
+.bb-importdesk .bb-import-page {
+    position: relative;
+    width: 150px;
+    cursor: pointer;
+    outline-offset: 3px;
+}
+
+.bb-importdesk .bb-import-page .bb-thumbsheet {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, .45);
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.bb-importdesk .bb-import-page.bb-side-left .bb-thumbsheet {
+    box-shadow: inset -10px 0 10px -10px rgba(0, 0, 0, .3), 0 2px 8px rgba(0, 0, 0, .45);
+}
+
+.bb-importdesk .bb-import-page.bb-side-right .bb-thumbsheet {
+    box-shadow: inset 10px 0 10px -10px rgba(0, 0, 0, .3), 0 2px 8px rgba(0, 0, 0, .45);
+}
+
+.bb-importdesk .bb-import-page:not(.selected) .bb-thumbsheet {
+    opacity: .45;
+}
+
+.bb-importdesk .bb-import-page.active .bb-thumbsheet,
+.bb-importdesk .bb-import-page:focus-visible .bb-thumbsheet {
+    outline: 3px solid #4dabf7;
+}
+
+.bb-importdesk .bb-import-select {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    z-index: 3;
+    margin: 0;
+    padding: 2px 4px;
+    background: rgba(255, 255, 255, .9);
+    border-radius: 3px;
+    line-height: 1;
+}
+
+.bb-importdesk .bb-import-number {
+    display: block;
+    margin-top: .25rem;
+    text-align: center;
+    font-size: 12px;
+    color: #dee2e6;
+}
+
+.bb-importdesk .bb-import-page .bb-desk-pin {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    z-index: 3;
+}
+
+.bb-importdesk .bb-import-row .bb-desk-chain {
+    top: 45%;
+    z-index: 4;
+}
+
+.bb-importdesk .bb-import-passages {
+    top: .75rem;
+    width: 380px;
+}
+
+.bb-importdesk .bb-passages {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 13px;
+}
+
+.bb-importdesk .bb-passage label {
+    display: flex;
+    gap: .4rem;
+    align-items: flex-start;
+    margin: 0;
+    padding: .35rem .25rem;
+    border-bottom: 1px solid #dee2e6;
+    cursor: pointer;
+}
+
+.bb-importdesk .bb-passage.onpage label {
+    background: #e7f5ff;
+    border-left: 3px solid #1971c2;
+}
+
+.bb-importdesk .bb-passage.hidden-passage .bb-passage-text {
+    color: #868e96;
+    text-decoration: line-through;
+}
+
+.bb-importdesk .bb-passage input {
+    margin-top: .2rem;
+}
+
+.bb-importdesk .bb-passage-kind {
+    flex: 0 0 5.5rem;
+    color: #495057;
+    font-size: 11px;
+    text-transform: uppercase;
+}
+
+.bb-importdesk .bb-passage-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.bb-importdesk .bb-import-dialog {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 40;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 4vh 1rem;
+    background: rgba(0, 0, 0, .55);
+}
+
+.bb-importdesk .bb-import-dialog[hidden] {
+    display: none;
+}
+
+.bb-importdesk .bb-import-dialogbox {
+    width: 100%;
+    max-width: 900px;
+    max-height: 92vh;
+    overflow-y: auto;
+    background: #fff;
+    color: #212529;
+    border-radius: 6px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, .5);
+}
+
+.bb-importdesk .bb-import-dialogbody {
+    padding: 1rem 1.25rem;
+}
+
+.bb-importdesk.bb-busy {
+    cursor: progress;
+}
+
+.bb-importdesk.bb-busy .bb-import-grid {
+    opacity: .5;
+    pointer-events: none;
+}
+
+/* Layout desk: format bar like a word processor. */
+.bb-desk .bb-desk-formatbar {
+    flex: 0 0 auto;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px;
+    padding: 4px .75rem;
+    background: #f1f3f4;
+    color: #202124;
+    border-bottom: 1px solid #c4c7c5;
+}
+
+.bb-desk .bb-desk-formatbar button,
+.bb-desk .bb-desk-formatbar .bb-fb-color {
+    min-width: 28px;
+    height: 28px;
+    margin: 0;
+    padding: 0 6px;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: #202124;
+    font-size: 14px;
+    line-height: 28px;
+    text-align: center;
+}
+
+.bb-desk .bb-desk-formatbar button:hover:not(:disabled),
+.bb-desk .bb-desk-formatbar .bb-fb-color:hover {
+    background: #e2e5e7;
+}
+
+.bb-desk .bb-desk-formatbar button.active {
+    background: #d3e3fd;
+    color: #0b57d0;
+}
+
+.bb-desk .bb-desk-formatbar button:disabled,
+.bb-desk .bb-desk-formatbar select:disabled,
+.bb-desk .bb-desk-formatbar input:disabled {
+    opacity: .4;
+}
+
+.bb-desk .bb-desk-formatbar select,
+.bb-desk .bb-desk-formatbar input[type="number"] {
+    height: 28px;
+    padding: 0 4px;
+    border: 1px solid #c4c7c5;
+    border-radius: 4px;
+    background: #fff;
+    color: #202124;
+    font-size: 13px;
+}
+
+.bb-desk .bb-desk-formatbar select[data-block] {
+    width: 10.5rem;
+}
+
+.bb-desk .bb-desk-formatbar input[type="number"] {
+    width: 3.6rem;
+    text-align: center;
+}
+
+.bb-desk .bb-fb-sep {
+    width: 1px;
+    height: 20px;
+    margin: 0 6px;
+    background: #c4c7c5;
+}
+
+.bb-desk .bb-fb-color {
+    position: relative;
+    display: inline-block;
+    cursor: pointer;
+}
+
+.bb-desk .bb-fb-color input {
+    position: absolute;
+    right: 3px;
+    bottom: 2px;
+    left: 3px;
+    width: auto;
+    height: 4px;
+    padding: 0;
+    border: 0;
+    cursor: pointer;
+}
+
+.bb-desk .bb-fb-hint {
+    font-size: 9px;
+    vertical-align: sub;
+}
+
+.bb-desk .bb-fb-status {
+    margin-left: auto;
+    color: #5f6368;
+    font-size: 12px;
+}
+
+.bb-importdesk .bb-import-ghost {
+    width: 150px;
+    aspect-ratio: 100 / 141.43;
+    border: 1px dashed rgba(255, 255, 255, .25);
+}
+
+.bb-importdesk .bb-import-filler {
+    cursor: default;
+}
+
+.bb-importdesk .bb-import-filler .bb-thumbsheet {
+    background: repeating-linear-gradient(135deg, #f1f3f5 0, #f1f3f5 8px, #dee2e6 8px, #dee2e6 16px);
+    opacity: .6;
 }

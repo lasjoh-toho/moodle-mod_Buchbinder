@@ -107,6 +107,7 @@ class restore_buchbinder_activity_structure_step extends restore_activity_struct
         $this->add_related_files('mod_buchbinder', 'intro', null);
         $this->add_related_files('mod_buchbinder', 'clips', null);
         $this->add_related_files('mod_buchbinder', 'source', 'buchbinder_source');
+        $this->add_related_files('mod_buchbinder', 'sourcemedia', 'buchbinder_source');
         $this->add_related_files('mod_buchbinder', 'page', 'buchbinder_page');
         $this->add_related_files('mod_buchbinder', 'pagecontent', 'buchbinder_page');
         $this->add_related_files('mod_buchbinder', 'audio', 'buchbinder_overlay');
@@ -120,6 +121,17 @@ class restore_buchbinder_activity_structure_step extends restore_activity_struct
             if (!$spreadid) {
                 $DB->set_field('buchbinder_page', 'spreadside', null, ['id' => $page->id]);
             }
+        }
+        // Passages placed on the pages of the import area.
+        $sources = $DB->get_records_select('buchbinder_source', 'buchbinderid = ? AND flowmap IS NOT NULL', [$instanceid]);
+        foreach ($sources as $source) {
+            $map = [];
+            foreach (json_decode($source->flowmap, true) ?: [] as $oldpageid => $indexes) {
+                if ($newpageid = $this->get_mappingid('buchbinder_page', $oldpageid)) {
+                    $map[$newpageid] = $indexes;
+                }
+            }
+            $DB->set_field('buchbinder_source', 'flowmap', json_encode($map), ['id' => $source->id]);
         }
     }
 }

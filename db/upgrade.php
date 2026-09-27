@@ -78,5 +78,34 @@ function xmldb_buchbinder_upgrade($oldversion) {
         upgrade_mod_savepoint(true, 2026092900, 'buchbinder');
     }
 
+    if ($oldversion < 2026092901) {
+        // Import area: staged pages, passages of continuous sources, side the frames were set for.
+        $table = new xmldb_table('buchbinder_page');
+        $fields = [
+            new xmldb_field('staged', XMLDB_TYPE_INTEGER, '1', null, XMLDB_NOTNULL, null, '0', 'pagestyle'),
+            new xmldb_field('layoutside', XMLDB_TYPE_CHAR, '5', null, null, null, null, 'staged'),
+        ];
+        foreach ($fields as $field) {
+            if (!$dbman->field_exists($table, $field)) {
+                $dbman->add_field($table, $field);
+            }
+        }
+        $table = new xmldb_table('buchbinder_source');
+        $fields = [
+            new xmldb_field('blocks', XMLDB_TYPE_TEXT, null, null, null, null, null, 'timecreated'),
+            new xmldb_field('hiddenblocks', XMLDB_TYPE_TEXT, null, null, null, null, null, 'blocks'),
+            new xmldb_field('flowmap', XMLDB_TYPE_TEXT, null, null, null, null, null, 'hiddenblocks'),
+            new xmldb_field('pagestyle', XMLDB_TYPE_CHAR, '20', null, null, null, null, 'flowmap'),
+            new xmldb_field('startright', XMLDB_TYPE_INTEGER, '1', null, XMLDB_NOTNULL, null, '0', 'pagestyle'),
+            new xmldb_field('measurekey', XMLDB_TYPE_CHAR, '64', null, null, null, null, 'startright'),
+        ];
+        foreach ($fields as $field) {
+            if (!$dbman->field_exists($table, $field)) {
+                $dbman->add_field($table, $field);
+            }
+        }
+        upgrade_mod_savepoint(true, 2026092901, 'buchbinder');
+    }
+
     return true;
 }

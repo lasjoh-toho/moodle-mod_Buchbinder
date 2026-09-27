@@ -1,0 +1,187 @@
+{{!
+    This file is part of Moodle - https://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Moodle is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
+}}
+{{!
+    @template mod_buchbinder/import_desk
+
+    Full screen import desk: sources, miniatures of the imported pages, range to take into the document,
+    passages of continuous sources.
+
+    Example context (json):
+    {"name": "Textbook", "isimport": true, "cmid": 1, "config": "{}", "forms": "", "showimport": false, "jobs": "",
+     "hassources": true, "harvesterdisabled": false, "haspages": true, "adopturl": "#",
+     "sources": [{"id": 1, "title": "Kapitel 1", "type": "Word", "staged": 3, "indocument": 0, "url": "#", "current": true}],
+     "current": {"title": "Kapitel 1", "type": "Word", "citation": "", "pagecount": 3, "indocument": 0, "flowed": true,
+                 "measured": false, "tufte": false, "startright": true, "hiddencount": 0, "isimage": false, "deleteurl": "#",
+                 "splitallurl": "#", "restyleurl": "#", "sourceid": 1, "sesskey": "x", "rangeall": "1-3"},
+     "rows": [{"ghostleft": true, "ghostright": false, "chained": false, "pages": [{"id": 5, "number": 1, "position": 1,
+               "side": "right", "filler": false, "linked": "", "pinside": "", "pinlabel": "", "cansplit": false, "canlink": true,
+               "thumb": {"isimage": false, "imageurl": "", "ratio": 141.4, "hasframes": false, "blank": true, "frames": []} }]}],
+     "positions": [{"value": -1, "label": "At the end", "selected": true}],
+     "links": {"import": "#", "desk": "#", "pages": "#", "sources": "#", "publish": "#", "preview": "#", "print": "#",
+               "layout": "#", "course": "#", "snippet": "#", "assetbank": "#"} }
+}}
+<div class="bb-desk bb-importdesk" id="buchbinder-import" data-config="{{config}}">
+    {{> mod_buchbinder/desk_menubar }}
+    <div class="bb-import-main">
+        <aside class="bb-import-sources" aria-label="{{#str}}sources, mod_buchbinder{{/str}}">
+            <button type="button" class="btn btn-primary w-100 mb-2" data-action="open-import" aria-controls="bb-import-dialog"
+                aria-expanded="{{#showimport}}true{{/showimport}}{{^showimport}}false{{/showimport}}">+ {{#str}}importfiles, mod_buchbinder{{/str}}</button>
+            <div class="bb-import-more">
+                <a href="{{links.snippet}}">{{#str}}clipboardsnippet, mod_buchbinder{{/str}}</a>
+                {{#links.assetbank}}<a href="{{links.assetbank}}">{{#str}}assetbank, mod_buchbinder{{/str}}</a>{{/links.assetbank}}
+            </div>
+            {{{jobs}}}
+            {{#hassources}}
+            <ul class="bb-import-sourcelist">
+                {{#sources}}
+                <li>
+                    <a href="{{url}}" class="{{#current}}current{{/current}}"{{#current}} aria-current="page"{{/current}}>
+                        <span class="bb-import-sourcetitle">{{title}}</span>
+                        <span class="bb-import-sourcemeta">{{type}} ·
+                            {{#str}}stagedcount, mod_buchbinder, {{staged}}{{/str}}{{#indocument}} · {{#str}}indocumentcount, mod_buchbinder, {{indocument}}{{/str}}{{/indocument}}</span>
+                    </a>
+                </li>
+                {{/sources}}
+            </ul>
+            {{/hassources}}
+            <p class="bb-desk-hint">{{#str}}importdeskhint, mod_buchbinder{{/str}}</p>
+        </aside>
+        <main class="bb-import-work">
+            {{#current}}
+            <div class="bb-import-head">
+                <div class="bb-import-headtitle">
+                    <h2>{{title}}</h2>
+                    <span class="badge badge-secondary bg-secondary">{{type}}</span>
+                    <span class="bb-import-count" data-region="pagecount">
+                        {{#str}}stagedcount, mod_buchbinder, {{pagecount}}{{/str}}
+                        {{#flowed}}
+                            {{#measured}}<span class="badge badge-success bg-success" data-region="measure">{{#str}}measured, mod_buchbinder{{/str}}</span>{{/measured}}
+                            {{^measured}}<span class="badge badge-warning bg-warning text-dark" data-region="measure">{{#str}}estimated, mod_buchbinder{{/str}}</span>{{/measured}}
+                        {{/flowed}}
+                    </span>
+                    {{#indocument}}<span class="bb-import-sourcemeta">{{#str}}indocumentcount, mod_buchbinder, {{indocument}}{{/str}}</span>{{/indocument}}
+                    <a class="bb-import-delete" href="{{deleteurl}}" data-action="confirm" data-confirm="{{#str}}confirmdeletesourcestaged, mod_buchbinder{{/str}}">{{#str}}deletesource, mod_buchbinder{{/str}}</a>
+                </div>
+                {{#citation}}<div class="bb-import-citation">{{{citation}}}</div>{{/citation}}
+                <div class="bb-import-options">
+                    {{#flowed}}
+                    <form method="get" action="{{restyleurl}}" class="bb-import-restyle">
+                        <input type="hidden" name="id" value="{{cmid}}">
+                        <input type="hidden" name="action" value="restyle">
+                        <input type="hidden" name="sourceid" value="{{sourceid}}">
+                        <input type="hidden" name="sesskey" value="{{sesskey}}">
+                        <label>{{#str}}pagestyle, mod_buchbinder{{/str}}
+                            <select name="pagestyle" class="custom-select form-select form-select-sm" data-action="autosubmit">
+                                <option value="standard"{{^tufte}} selected{{/tufte}}>{{#str}}pagestyle_standard, mod_buchbinder{{/str}}</option>
+                                <option value="tufte"{{#tufte}} selected{{/tufte}}>{{#str}}pagestyle_tufte, mod_buchbinder{{/str}}</option>
+                            </select>
+                        </label>
+                        <label><input type="checkbox" name="startright" value="1" data-action="autosubmit"{{#startright}} checked{{/startright}}>
+                            {{#str}}startright, mod_buchbinder{{/str}}</label>
+                    </form>
+                    <button type="button" class="btn btn-sm btn-outline-light" data-action="open-passages">&#xB6; {{#str}}passages, mod_buchbinder{{/str}}{{#hiddencount}} ({{#str}}hiddencount, mod_buchbinder, {{hiddencount}}{{/str}}){{/hiddencount}}</button>
+                    {{/flowed}}
+                    {{#isimage}}<a class="btn btn-sm btn-outline-light" href="{{splitallurl}}">&#x2702; {{#str}}splitall, mod_buchbinder{{/str}}</a>{{/isimage}}
+                </div>
+            </div>
+            {{/current}}
+            {{#haspages}}
+            <form class="bb-import-adopt" method="post" action="{{adopturl}}">
+                <input type="hidden" name="id" value="{{cmid}}">
+                <input type="hidden" name="action" value="adopt">
+                <input type="hidden" name="sourceid" value="{{current.sourceid}}">
+                <input type="hidden" name="sesskey" value="{{current.sesskey}}">
+                <label for="bb-import-range">{{#str}}adoptrange, mod_buchbinder{{/str}}</label>
+                <input type="text" id="bb-import-range" name="range" class="form-control form-control-sm" value="{{current.rangeall}}"
+                    data-region="range" aria-describedby="bb-import-rangehelp" size="14">
+                <label for="bb-import-after" class="sr-only visually-hidden">{{#str}}adoptposition, mod_buchbinder{{/str}}</label>
+                <select id="bb-import-after" name="after" class="custom-select form-select form-select-sm">
+                    {{#positions}}<option value="{{value}}"{{#selected}} selected{{/selected}}>{{label}}</option>{{/positions}}
+                </select>
+                <button type="submit" class="btn btn-sm btn-primary">{{#str}}adopt, mod_buchbinder{{/str}}</button>
+                <button type="button" class="btn btn-sm btn-link" data-action="select-all">{{#str}}selectall{{/str}}</button>
+                <button type="button" class="btn btn-sm btn-link" data-action="select-none">{{#str}}deselectall{{/str}}</button>
+                <span id="bb-import-rangehelp" class="bb-desk-hint">{{#str}}adoptrangehelp, mod_buchbinder{{/str}}</span>
+            </form>
+            <div class="bb-import-grid" role="list">
+                {{#rows}}
+                <div class="bb-import-row{{#chained}} chained{{/chained}}" role="listitem">
+                    {{#ghostleft}}<div class="bb-import-ghost" aria-hidden="true"></div>{{/ghostleft}}
+                    {{#pages}}
+                    {{#filler}}
+                    <div class="bb-import-page bb-import-filler bb-side-{{side}}" title="{{#str}}fillerpage, mod_buchbinder{{/str}}">
+                        <div class="bb-sheet bb-thumbsheet" style="aspect-ratio: 100 / 141.43;"></div>
+                        <span class="bb-import-number">auto</span>
+                    </div>
+                    {{/filler}}
+                    {{^filler}}
+                    <div class="bb-import-page bb-side-{{side}}" data-pageid="{{id}}" data-number="{{number}}" data-position="{{position}}"
+                        data-linked="{{linked}}" data-pinside="{{pinside}}" data-canlink="{{#canlink}}1{{/canlink}}"
+                        data-cansplit="{{#cansplit}}1{{/cansplit}}" tabindex="0" aria-haspopup="menu"
+                        aria-label="{{#str}}pagex, mod_buchbinder, {{number}}{{/str}}">
+                        <label class="bb-import-select">
+                            <input type="checkbox" data-region="select" value="{{number}}" checked>
+                            <span class="sr-only visually-hidden">{{#str}}selectpage, mod_buchbinder, {{number}}{{/str}}</span>
+                        </label>
+                        {{#thumb}}{{> mod_buchbinder/page_thumb }}{{/thumb}}
+                        <span class="bb-import-number">{{number}}</span>
+                        {{#pinlabel}}<span class="bb-desk-pin" title="{{#str}}pinnedpage, mod_buchbinder{{/str}}">{{pinlabel}}</span>{{/pinlabel}}
+                    </div>
+                    {{/filler}}
+                    {{/pages}}
+                    {{#ghostright}}<div class="bb-import-ghost" aria-hidden="true"></div>{{/ghostright}}
+                    {{#chained}}<span class="bb-desk-chain" title="{{#str}}linkedpages, mod_buchbinder{{/str}}">&#x1F517;</span>{{/chained}}
+                </div>
+                {{/rows}}
+            </div>
+            {{/haspages}}
+            {{^haspages}}
+                <div class="bb-desk-empty">
+                    {{#current}}<p>{{#str}}nostagedpages, mod_buchbinder{{/str}}</p>{{/current}}
+                    {{^current}}<p>{{#str}}nopages, mod_buchbinder{{/str}}</p>{{/current}}
+                    <button type="button" class="btn btn-primary" data-action="open-import">+ {{#str}}importfiles, mod_buchbinder{{/str}}</button>
+                    <a class="btn btn-secondary" href="{{links.desk}}">{{#str}}desk, mod_buchbinder{{/str}}</a>
+                </div>
+            {{/haspages}}
+        </main>
+        <aside class="bb-desk-panel bb-import-passages dock-right" aria-label="{{#str}}passages, mod_buchbinder{{/str}}" hidden>
+            <div class="bb-desk-panelhead">
+                <strong data-region="passagestitle">{{#str}}passages, mod_buchbinder{{/str}}</strong>
+                <button type="button" data-action="close-passages" title="{{#str}}closebuttontitle{{/str}}"
+                    aria-label="{{#str}}closebuttontitle{{/str}}">&#x2715;</button>
+            </div>
+            <div class="bb-panel-body">
+                <p class="small text-muted">{{#str}}passageshelp, mod_buchbinder{{/str}}</p>
+                <ol class="bb-passages" data-region="passages"></ol>
+            </div>
+        </aside>
+    </div>
+    <div class="bb-import-dialog" id="bb-import-dialog" role="dialog" aria-modal="true" aria-labelledby="bb-import-dialogtitle"{{^showimport}} hidden{{/showimport}}>
+        <div class="bb-import-dialogbox">
+            <div class="bb-desk-panelhead">
+                <strong id="bb-import-dialogtitle">{{#str}}importfiles, mod_buchbinder{{/str}}</strong>
+                <button type="button" data-action="close-import" title="{{#str}}closebuttontitle{{/str}}"
+                    aria-label="{{#str}}closebuttontitle{{/str}}">&#x2715;</button>
+            </div>
+            <div class="bb-import-dialogbody">
+                <p class="small text-muted">{{#str}}importtostaging, mod_buchbinder{{/str}}</p>
+                {{{forms}}}
+                {{#harvesterdisabled}}<div class="text-muted small">{{#str}}harvesterdisabled, mod_buchbinder{{/str}}</div>{{/harvesterdisabled}}
+            </div>
+        </div>
+    </div>
+</div>

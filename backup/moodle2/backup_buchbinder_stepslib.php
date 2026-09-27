@@ -37,12 +37,13 @@ class backup_buchbinder_activity_structure_step extends backup_activity_structur
 
         $sources = new backup_nested_element('sources');
         $source = new backup_nested_element('source', ['id'], [
-            'sourcetype', 'title', 'url', 'author', 'filename', 'timeaccessed', 'showcitation', 'timecreated']);
+            'sourcetype', 'title', 'url', 'author', 'filename', 'timeaccessed', 'showcitation', 'timecreated', 'blocks',
+            'hiddenblocks', 'flowmap', 'pagestyle', 'startright', 'measurekey']);
 
         $pages = new backup_nested_element('pages');
         $page = new backup_nested_element('page', ['id'], [
             'sourceid', 'sortorder', 'pagetype', 'content', 'contentformat', 'width', 'height', 'landscapelock',
-            'spreadid', 'spreadside', 'pinside', 'filler', 'pagestyle', 'timemodified']);
+            'spreadid', 'spreadside', 'pinside', 'filler', 'pagestyle', 'staged', 'layoutside', 'timemodified']);
 
         $overlays = new backup_nested_element('overlays');
         $overlay = new backup_nested_element('overlay', ['id'], [
@@ -63,6 +64,7 @@ class backup_buchbinder_activity_structure_step extends backup_activity_structur
         $buchbinder->annotate_files('mod_buchbinder', 'intro', null);
         $buchbinder->annotate_files('mod_buchbinder', 'clips', null);
         $source->annotate_files('mod_buchbinder', 'source', 'id');
+        $source->annotate_files('mod_buchbinder', 'sourcemedia', 'id');
         $page->annotate_files('mod_buchbinder', 'page', 'id');
         $page->annotate_files('mod_buchbinder', 'pagecontent', 'id');
         $overlay->annotate_files('mod_buchbinder', 'audio', 'id');

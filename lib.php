@@ -116,7 +116,7 @@ function buchbinder_pluginfile($course, $cm, $context, $filearea, $args, $forced
     }
     require_course_login($course, true, $cm);
 
-    if ($filearea === 'source') {
+    if ($filearea === 'source' || $filearea === 'sourcemedia') {
         require_capability('mod/buchbinder:edit', $context);
     } else if (in_array($filearea, ['page', 'pagecontent', 'audio', 'frameimage', 'clips'])) {
         require_capability('mod/buchbinder:view', $context);
@@ -169,6 +169,14 @@ function buchbinder_extend_settings_navigation(settings_navigation $settings, na
     }
     $context = context_module::instance($cm->id);
     if (has_capability('mod/buchbinder:edit', $context)) {
+        $node->add(
+            get_string('importdesk', 'mod_buchbinder'),
+            new moodle_url('/mod/buchbinder/import.php', ['id' => $cm->id]),
+            navigation_node::TYPE_SETTING,
+            null,
+            'buchbinderimport',
+            new pix_icon('i/import', '')
+        );
         $node->add(
             get_string('desk', 'mod_buchbinder'),
             new moodle_url('/mod/buchbinder/desk.php', ['id' => $cm->id]),

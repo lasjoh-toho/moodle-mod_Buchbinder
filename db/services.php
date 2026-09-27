@@ -67,6 +67,13 @@ $functions = [
         'ajax' => true,
         'capabilities' => 'mod/buchbinder:edit',
     ],
+    'mod_buchbinder_set_source' => [
+        'classname' => \mod_buchbinder\external\set_source::class,
+        'description' => 'Set a continuous source again in the import area (hidden passages, measured text).',
+        'type' => 'write',
+        'ajax' => true,
+        'capabilities' => 'mod/buchbinder:edit',
+    ],
     'mod_buchbinder_save_frame_image' => [
         'classname' => \mod_buchbinder\external\save_frame_image::class,
         'description' => 'Store the image of an image frame.',

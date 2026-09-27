@@ -164,7 +164,9 @@ final class integration_test extends \advanced_testcase {
         $this->resetAfterTest();
         $PAGE->set_url('/');
         $output = $PAGE->get_renderer('core');
-        foreach (['view', 'desk', 'studio_pages', 'studio_sources', 'studio_publish', 'assetbank'] as $template) {
+        $templates = ['view', 'desk', 'import_desk', 'page_thumb', 'desk_menubar', 'studio_pages', 'studio_sources',
+            'studio_publish', 'assetbank'];
+        foreach ($templates as $template) {
             $html = $output->render_from_template('mod_buchbinder/' . $template, ['cmid' => 1, 'config' => '{}']);
             $this->assertIsString($html);
         }

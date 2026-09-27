@@ -21,7 +21,8 @@
  * @copyright  2026 Buchbinder contributors
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-define(['core/ajax', 'core/notification', 'core/str'], function(Ajax, Notification, Str) {
+define(['core/ajax', 'core/notification', 'core/str', 'mod_buchbinder/pagemenu'],
+function(Ajax, Notification, Str, PageMenu) {
 
     var STRINGS = [
         'overlay_textbox', 'overlay_mask', 'overlay_audio', 'overlay_glossary', 'overlay_reflow', 'overlay_column',
@@ -33,9 +34,7 @@ define(['core/ajax', 'core/notification', 'core/str'], function(Ajax, Notificati
         'overlay_textframe', 'overlay_imageframe', 'fontscale', 'textcolumns', 'frameborder', 'nobackground', 'uploadimage',
         'imagefit', 'fit_contain', 'fit_cover', 'alttext', 'caption', 'edittext', 'italic', 'role_h2', 'role_h3',
         'paragraph', 'bulletlist', 'numberedlist', 'overset', 'imagesaved', 'confirmdeletepage', 'newframetext',
-        'errornotimage', 'menu_linknext', 'menu_unlink', 'menu_pinleft', 'menu_pinright', 'menu_unpin', 'blankbefore',
-        'blankafter', 'deletepage', 'fillerpage', 'pagesmenu', 'framestyle', 'framestyle_standard', 'pagestyle_tufte',
-        'framestyle_sidenote'
+        'errornotimage', 'linkurl', 'formatediting', 'formatframe', 'formatbarhint'
     ];
 
     var Editor = function(root) {
@@ -245,6 +244,7 @@ define(['core/ajax', 'core/notification', 'core/str'], function(Ajax, Notificati
         }
         this.renderPanel();
         this.showPanel(o);
+        this.updateFormatBar();
     };
 
     /**
@@ -265,104 +265,6 @@ define(['core/ajax', 'core/notification', 'core/str'], function(Ajax, Notificati
         var dock = this.dock || (page && page.side === 'right' ? 'left' : 'right');
         frame.classList.toggle('dock-left', dock === 'left');
         frame.classList.toggle('dock-right', dock !== 'left');
-    };
-
-    /**
-     * Pages panel: context menu of the thumbnails (chain, pin to a side, blank pages).
-     */
-    Editor.prototype.bindPageMenu = function() {
-        var self = this;
-        var str = this.str;
-        var menu = null;
-        var close = function() {
-            if (menu) {
-                menu.remove();
-                menu = null;
-            }
-        };
-        var go = function(action, pageid) {
-            window.location.href = self.config.actionurl + '&action=' + action + '&pageid=' + pageid;
-        };
-        var open = function(thumb, x, y) {
-            close();
-            var d = thumb.dataset;
-            var items = [];
-            if (d.linked) {
-                items.push(['unlink', str.menu_unlink]);
-            } else if (d.canlink && !d.filler) {
-                items.push(['link', str.menu_linknext]);
-            }
-            if (!d.linked && !d.filler) {
-                items.push(d.pinside === 'left' ? ['unpin', str.menu_unpin] : ['pinleft', str.menu_pinleft]);
-                items.push(d.pinside === 'right' ? ['unpin', str.menu_unpin] : ['pinright', str.menu_pinright]);
-            }
-            items.push(null, ['blankbefore', str.blankbefore], ['blankafter', str.blankafter], null,
-                ['deletepage', str.deletepage]);
-            menu = document.createElement('div');
-            menu.className = 'bb-desk-contextmenu';
-            menu.setAttribute('role', 'menu');
-            menu.setAttribute('aria-label', str.pagesmenu);
-            if (d.filler) {
-                var note = document.createElement('div');
-                note.className = 'bb-desk-contextnote';
-                note.textContent = str.fillerpage;
-                menu.appendChild(note);
-            }
-            items.forEach(function(item) {
-                if (item === null) {
-                    menu.appendChild(document.createElement('hr'));
-                    return;
-                }
-                var b = document.createElement('button');
-                b.type = 'button';
-                b.setAttribute('role', 'menuitem');
-                b.textContent = item[1];
-                b.addEventListener('click', function() {
-                    // eslint-disable-next-line no-alert
-                    if (item[0] === 'deletepage' && !window.confirm(str.confirmdeletepage)) {
-                        return;
-                    }
-                    go(item[0], d.pageid);
-                });
-                menu.appendChild(b);
-            });
-            menu.addEventListener('keydown', function(e) {
-                var buttons = Array.prototype.slice.call(menu.querySelectorAll('button'));
-                var i = buttons.indexOf(document.activeElement);
-                if (e.key === 'Escape') {
-                    close();
-                    thumb.closest('a').focus();
-                } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-                    var n = buttons.length;
-                    buttons[(i + (e.key === 'ArrowDown' ? 1 : n - 1)) % n].focus();
-                } else {
-                    return;
-                }
-                e.preventDefault();
-            });
-            document.body.appendChild(menu);
-            var r = menu.getBoundingClientRect();
-            menu.style.left = Math.min(x, window.innerWidth - r.width - 4) + 'px';
-            menu.style.top = Math.min(y, window.innerHeight - r.height - 4) + 'px';
-            menu.querySelector('button').focus();
-        };
-        this.root.querySelectorAll('.bb-desk-spread').forEach(function(spread) {
-            spread.addEventListener('contextmenu', function(e) {
-                var thumb = e.target.closest('.bb-desk-thumb') || spread.querySelector('.bb-desk-thumb');
-                if (!thumb) {
-                    return;
-                }
-                e.preventDefault();
-                var r = thumb.getBoundingClientRect();
-                open(thumb, e.clientX || r.right, e.clientY || r.top);
-            });
-        });
-        document.addEventListener('pointerdown', function(e) {
-            if (menu && !menu.contains(e.target)) {
-                close();
-            }
-        });
-        window.addEventListener('blur', close);
     };
 
     // Persistence.
@@ -580,7 +482,9 @@ define(['core/ajax', 'core/notification', 'core/str'], function(Ajax, Notificati
                 self.select(null);
             });
         }
-        this.bindPageMenu();
+        this.bindFormatBar();
+        PageMenu.init(this.root, {selector: '.bb-desk-thumb', container: '.bb-desk-spread',
+            actionurl: this.config.actionurl, blankpages: true});
         var zoom = this.root.querySelector('[data-action="zoom"]');
         if (zoom) {
             zoom.addEventListener('input', function() {
@@ -849,6 +753,7 @@ define(['core/ajax', 'core/notification', 'core/str'], function(Ajax, Notificati
         content.addEventListener('input', this.onInput = function() {
             self.checkOverset(o);
         });
+        this.updateFormatBar();
     };
 
     Editor.prototype.stopEditing = function() {
@@ -865,14 +770,186 @@ define(['core/ajax', 'core/notification', 'core/str'], function(Ajax, Notificati
             o.settings.html = content.innerHTML;
             this.save(o).catch(Notification.exception);
         }
+        this.updateFormatBar();
     };
 
-    Editor.prototype.format = function(command, value) {
-        if (this.editing) {
-            this.editing.el.querySelector('.bb-frame-content').focus();
-            document.execCommand(command, false, value);
-            this.checkOverset(this.editing);
+    // Format bar (like a word processor): paragraph styles, character formatting, frame style and size.
+
+    /** @var {string[]} Commands with an on/off state shown in the format bar. */
+    var STATE_COMMANDS = ['bold', 'italic', 'underline', 'strikeThrough', 'insertUnorderedList', 'insertOrderedList',
+        'justifyLeft', 'justifyCenter', 'justifyRight', 'justifyFull'];
+
+    /** @var {number} Body text size in pt at font scale 1. */
+    var BODY_PT = 11;
+
+    Editor.prototype.bindFormatBar = function() {
+        var self = this;
+        var bar = this.root.querySelector('[data-region="formatbar"]');
+        if (!bar) {
+            return;
         }
+        this.formatbar = bar;
+        this.savedRange = null;
+        document.addEventListener('selectionchange', function() {
+            if (!self.editing) {
+                return;
+            }
+            var sel = window.getSelection();
+            var content = self.editing.el.querySelector('.bb-frame-content');
+            if (sel.rangeCount && content.contains(sel.anchorNode)) {
+                self.savedRange = sel.getRangeAt(0).cloneRange();
+                self.updateFormatBar();
+            }
+        });
+        bar.querySelectorAll('button').forEach(function(b) {
+            b.addEventListener('mousedown', function(e) {
+                // Keep the text selection in the frame.
+                e.preventDefault();
+            });
+        });
+        bar.querySelectorAll('button[data-cmd]').forEach(function(b) {
+            b.addEventListener('click', function() {
+                self.command(b.dataset.cmd);
+            });
+        });
+        bar.querySelectorAll('input[data-cmd]').forEach(function(input) {
+            input.addEventListener('change', function() {
+                self.command(input.dataset.cmd, input.value);
+            });
+        });
+        bar.querySelector('[data-block]').addEventListener('change', function(e) {
+            self.command('formatBlock', '<' + e.target.value + '>');
+        });
+        bar.querySelector('[data-frame="style"]').addEventListener('change', function(e) {
+            self.frameSetting('style', e.target.value);
+        });
+        var size = bar.querySelector('[data-frame="size"]');
+        size.addEventListener('change', function() {
+            self.frameSetting('fontscale', Math.max(0.5, Math.min(3, (parseFloat(size.value) || BODY_PT) / BODY_PT)));
+        });
+        bar.querySelectorAll('[data-size]').forEach(function(b) {
+            b.addEventListener('click', function() {
+                var pt = (parseFloat(size.value) || BODY_PT) + parseInt(b.dataset.size, 10) * 0.5;
+                size.value = pt;
+                self.frameSetting('fontscale', Math.max(0.5, Math.min(3, pt / BODY_PT)));
+            });
+        });
+        this.updateFormatBar();
+    };
+
+    /**
+     * Run an editing command on the text frame being edited.
+     *
+     * If a text frame is only selected, editing starts and the command applies to the whole text.
+     *
+     * @param {string} command
+     * @param {string} value
+     */
+    Editor.prototype.command = function(command, value) {
+        if (!this.editing) {
+            if (!this.selected || this.selected.type !== 'textframe') {
+                return;
+            }
+            this.startEditing(this.selected);
+            var all = document.createRange();
+            all.selectNodeContents(this.editing.el.querySelector('.bb-frame-content'));
+            this.savedRange = all;
+        }
+        var content = this.editing.el.querySelector('.bb-frame-content');
+        content.focus();
+        var sel = window.getSelection();
+        if (this.savedRange && content.contains(this.savedRange.startContainer)) {
+            sel.removeAllRanges();
+            sel.addRange(this.savedRange);
+        }
+        if (command === 'createLink') {
+            // eslint-disable-next-line no-alert
+            value = window.prompt(this.str.linkurl, 'https://');
+            if (!value) {
+                return;
+            }
+        }
+        document.execCommand('styleWithCSS', false, command === 'foreColor' || command === 'hiliteColor');
+        document.execCommand(command, false, value || null);
+        this.checkOverset(this.editing);
+        this.updateFormatBar();
+    };
+
+    /**
+     * Change a setting of the selected text frame and save it.
+     *
+     * @param {string} key
+     * @param {*} value
+     */
+    Editor.prototype.frameSetting = function(key, value) {
+        var o = this.selected;
+        if (!o || o.type !== 'textframe') {
+            return;
+        }
+        if (this.editing === o) {
+            o.settings.html = o.el.querySelector('.bb-frame-content').innerHTML;
+        }
+        o.settings[key] = value;
+        this.refresh(o);
+        this.save(o).catch(Notification.exception);
+        this.updateFormatBar();
+    };
+
+    /**
+     * Block element (paragraph, heading, list item …) at the text cursor of the frame being edited.
+     *
+     * @returns {HTMLElement|null}
+     */
+    Editor.prototype.currentBlock = function() {
+        var content = this.editing ? this.editing.el.querySelector('.bb-frame-content') : null;
+        var node = this.savedRange ? this.savedRange.startContainer : null;
+        if (!content || !node || !content.contains(node)) {
+            return null;
+        }
+        var el = node.nodeType === 1 ? node : node.parentElement;
+        var found = el ? el.closest('p, h1, h2, h3, h4, h5, h6, blockquote, pre, li') : null;
+        if (found && found.tagName === 'P' && found.parentElement.closest('blockquote')
+                && content.contains(found.parentElement.closest('blockquote'))) {
+            found = found.parentElement.closest('blockquote');
+        }
+        return found && content.contains(found) ? found : null;
+    };
+
+    /**
+     * Show the state of the selection in the format bar.
+     */
+    Editor.prototype.updateFormatBar = function() {
+        var bar = this.formatbar;
+        if (!bar) {
+            return;
+        }
+        var frame = this.selected && this.selected.type === 'textframe' ? this.selected : null;
+        var editing = !!this.editing;
+        bar.classList.toggle('editing', editing);
+        bar.querySelectorAll('[data-cmd], [data-block], [data-frame], [data-size]').forEach(function(el) {
+            el.disabled = !frame;
+        });
+        var status = bar.querySelector('[data-region="formatstatus"]');
+        var hint = frame ? this.str.formatframe : this.str.formatbarhint;
+        status.textContent = editing ? this.str.formatediting : hint;
+        if (!frame) {
+            return;
+        }
+        bar.querySelector('[data-frame="style"]').value = frame.settings.style || '';
+        bar.querySelector('[data-frame="size"]').value = Math.round(BODY_PT * (frame.settings.fontscale || 1) * 2) / 2;
+        var block = bar.querySelector('[data-block]');
+        var element = editing ? this.currentBlock() : null;
+        var current = element ? element.tagName.toLowerCase() : 'p';
+        block.value = block.querySelector('option[value="' + current + '"]') ? current : 'p';
+        var align = element ? window.getComputedStyle(element).textAlign : '';
+        var aligned = {justifyLeft: /^(left|start)$/.test(align), justifyCenter: align === 'center',
+            justifyRight: /^(right|end)$/.test(align), justifyFull: align === 'justify'};
+        STATE_COMMANDS.forEach(function(command) {
+            var b = bar.querySelector('[data-cmd="' + command + '"]');
+            var on = editing && (command in aligned ? aligned[command] : document.queryCommandState(command));
+            b.classList.toggle('active', on);
+            b.setAttribute('aria-pressed', on ? 'true' : 'false');
+        });
     };
 
     Editor.prototype.uploadFrameImage = function(o, file) {
@@ -904,40 +981,15 @@ define(['core/ajax', 'core/notification', 'core/str'], function(Ajax, Notificati
         var str = this.str;
         var s = o.settings;
         if (o.type === 'textframe') {
-            var tools = document.createElement('div');
-            tools.className = 'bb-format-tools mb-2';
-            [['bold', 'B', null], ['italic', 'I', null], ['formatBlock', str.role_h2, 'h2'], ['formatBlock', str.role_h3, 'h3'],
-                ['formatBlock', str.paragraph, 'p'], ['insertUnorderedList', '•', null],
-                ['insertOrderedList', '1.', null]].forEach(function(t) {
-                var b = self.button(tools, t[1], 'btn-outline-secondary', function() {
-                    self.startEditing(o);
-                    self.format(t[0], t[2]);
-                });
-                var titles = {bold: str.bold, italic: str.italic};
-                b.title = titles[t[0]] || t[1];
-                b.addEventListener('mousedown', function(e) {
-                    // Keep the text selection in the frame.
-                    e.preventDefault();
-                });
-            });
-            body.appendChild(tools);
             this.button(body, str.edittext, 'btn-outline-primary', function() {
                 self.startEditing(o);
             });
-            var scale = this.field(body, str.fontscale, this.input('number', s.fontscale));
-            scale.min = 0.5;
-            scale.max = 3;
-            scale.step = 0.05;
             var cols = this.field(body, str.textcolumns, this.selectInput([[1, '1'], [2, '2'], [3, '3']], s.columns));
             var nobg = this.field(body, str.nobackground, this.input('checkbox', !s.bgcolor));
             var bg = this.field(body, str.bgcolor, this.input('color', s.bgcolor || '#ffffff'));
             var border = this.field(body, str.frameborder, this.input('checkbox', s.border));
-            var fstyle = this.field(body, str.framestyle, this.selectInput([['', str.framestyle_standard],
-                ['tufte', str.pagestyle_tufte], ['sidenote', str.framestyle_sidenote]], s.style || ''));
             read.push(function() {
                 self.stopEditing();
-                s.style = fstyle.value;
-                s.fontscale = parseFloat(scale.value) || 1;
                 s.columns = parseInt(cols.value, 10) || 1;
                 s.bgcolor = nobg.checked ? '' : bg.value;
                 s.border = border.checked;

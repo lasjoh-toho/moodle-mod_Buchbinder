@@ -22,7 +22,8 @@
     Example context (json):
     {"name": "Textbook", "config": "{}", "hasglossaries": false, "issues": 0, "addpageurl": "#", "prevurl": "", "nexturl": "#",
      "double": true, "hasstages": true,
-     "links": {"import": "#", "pages": "#", "sources": "#", "publish": "#", "preview": "#", "print": "#", "layout": "#", "course": "#"},
+     "isdesk": true, "zoom": true,
+     "links": {"import": "#", "desk": "#", "pages": "#", "sources": "#", "publish": "#", "preview": "#", "print": "#", "layout": "#", "course": "#"},
      "spreads": [{"index": 0, "current": true, "url": "#", "label": "1", "double": false, "single": "right", "chained": false,
                   "pages": [{"id": 1, "position": 1, "side": "right", "thumb": "", "frames": 1, "blank": false, "issue": false,
                              "alignurl": "#", "linked": "", "pinside": "right", "pinlabel": "R", "filler": false, "canlink": true}]}],
@@ -32,23 +33,54 @@
                  "actions": {"blankbefore": "#", "blankafter": "#", "moveup": "#", "movedown": "#", "delete": "#"} }]}
 }}
 <div class="bb-desk mod-buchbinder-editor" id="buchbinder-editor" data-config="{{config}}">
-    <header class="bb-desk-menubar">
-        <a class="bb-desk-brand" href="{{links.course}}" title="{{#str}}backtocourse, mod_buchbinder{{/str}}">&#x2190;</a>
-        <strong class="bb-desk-title text-truncate">{{name}}</strong>
-        <nav class="bb-desk-menu" aria-label="{{#str}}studio, mod_buchbinder{{/str}}">
-            <a href="{{links.import}}">{{#str}}tab_import, mod_buchbinder{{/str}}</a>
-            <a href="{{links.pages}}">{{#str}}tab_pages, mod_buchbinder{{/str}}</a>
-            <a href="{{links.sources}}">{{#str}}tab_sources, mod_buchbinder{{/str}}</a>
-            <a href="{{links.layout}}">{{#str}}newlayoutpage, mod_buchbinder{{/str}}</a>
-            <a href="{{links.publish}}">{{#str}}tab_publish, mod_buchbinder{{/str}}</a>
-            <a href="{{links.print}}">{{#str}}ecoprint, mod_buchbinder{{/str}}</a>
-            <a href="{{links.preview}}" class="bb-desk-preview">{{#str}}preview, mod_buchbinder{{/str}}</a>
-        </nav>
-        <label class="bb-desk-zoom">
-            <span>{{#str}}zoom, mod_buchbinder{{/str}}</span>
-            <input type="range" min="40" max="200" value="100" step="10" data-action="zoom">
-        </label>
-    </header>
+    {{> mod_buchbinder/desk_menubar }}
+    <div class="bb-desk-formatbar" role="toolbar" aria-label="{{#str}}formatbar, mod_buchbinder{{/str}}" data-region="formatbar">
+        <button type="button" data-cmd="undo" title="{{#str}}undo, mod_buchbinder{{/str}}" aria-label="{{#str}}undo, mod_buchbinder{{/str}}">&#x21B6;</button>
+        <button type="button" data-cmd="redo" title="{{#str}}redo, mod_buchbinder{{/str}}" aria-label="{{#str}}redo, mod_buchbinder{{/str}}">&#x21B7;</button>
+        <span class="bb-fb-sep"></span>
+        <select data-block title="{{#str}}paragraphstyle, mod_buchbinder{{/str}}" aria-label="{{#str}}paragraphstyle, mod_buchbinder{{/str}}">
+            <option value="p">{{#str}}pstyle_p, mod_buchbinder{{/str}}</option>
+            <option value="h1">{{#str}}pstyle_h1, mod_buchbinder{{/str}}</option>
+            <option value="h2">{{#str}}pstyle_h2, mod_buchbinder{{/str}}</option>
+            <option value="h3">{{#str}}pstyle_h3, mod_buchbinder{{/str}}</option>
+            <option value="h4">{{#str}}pstyle_h4, mod_buchbinder{{/str}}</option>
+            <option value="blockquote">{{#str}}pstyle_blockquote, mod_buchbinder{{/str}}</option>
+            <option value="pre">{{#str}}pstyle_pre, mod_buchbinder{{/str}}</option>
+        </select>
+        <select data-frame="style" title="{{#str}}framestyle, mod_buchbinder{{/str}}" aria-label="{{#str}}framestyle, mod_buchbinder{{/str}}">
+            <option value="">{{#str}}framestyle_standard, mod_buchbinder{{/str}}</option>
+            <option value="tufte">{{#str}}pagestyle_tufte, mod_buchbinder{{/str}}</option>
+            <option value="sidenote">{{#str}}framestyle_sidenote, mod_buchbinder{{/str}}</option>
+        </select>
+        <span class="bb-fb-sep"></span>
+        <button type="button" data-size="-1" title="{{#str}}fontsmaller, mod_buchbinder{{/str}}" aria-label="{{#str}}fontsmaller, mod_buchbinder{{/str}}">&#x2212;</button>
+        <input type="number" data-frame="size" min="5" max="33" step="0.5" value="11" title="{{#str}}fontsizept, mod_buchbinder{{/str}}" aria-label="{{#str}}fontsizept, mod_buchbinder{{/str}}">
+        <button type="button" data-size="1" title="{{#str}}fontlarger, mod_buchbinder{{/str}}" aria-label="{{#str}}fontlarger, mod_buchbinder{{/str}}">+</button>
+        <span class="bb-fb-sep"></span>
+        <button type="button" data-cmd="bold" title="{{#str}}bold, mod_buchbinder{{/str}}" aria-label="{{#str}}bold, mod_buchbinder{{/str}}"><b>B</b></button>
+        <button type="button" data-cmd="italic" title="{{#str}}italic, mod_buchbinder{{/str}}" aria-label="{{#str}}italic, mod_buchbinder{{/str}}"><i>I</i></button>
+        <button type="button" data-cmd="underline" title="{{#str}}underline, mod_buchbinder{{/str}}" aria-label="{{#str}}underline, mod_buchbinder{{/str}}"><u>U</u></button>
+        <button type="button" data-cmd="strikeThrough" title="{{#str}}strikethrough, mod_buchbinder{{/str}}" aria-label="{{#str}}strikethrough, mod_buchbinder{{/str}}"><s>S</s></button>
+        <label class="bb-fb-color" title="{{#str}}textcolor, mod_buchbinder{{/str}}"><span aria-hidden="true">A</span>
+            <input type="color" data-cmd="foreColor" value="#000000" aria-label="{{#str}}textcolor, mod_buchbinder{{/str}}"></label>
+        <label class="bb-fb-color bb-fb-highlight" title="{{#str}}highlight, mod_buchbinder{{/str}}"><span aria-hidden="true">&#x270E;</span>
+            <input type="color" data-cmd="hiliteColor" value="#ffec99" aria-label="{{#str}}highlight, mod_buchbinder{{/str}}"></label>
+        <span class="bb-fb-sep"></span>
+        <button type="button" data-cmd="createLink" title="{{#str}}insertlink, mod_buchbinder{{/str}}" aria-label="{{#str}}insertlink, mod_buchbinder{{/str}}">&#x1F517;</button>
+        <span class="bb-fb-sep"></span>
+        <button type="button" data-cmd="justifyLeft" title="{{#str}}align_left, mod_buchbinder{{/str}}" aria-label="{{#str}}align_left, mod_buchbinder{{/str}}">&#x2261;<span class="bb-fb-hint">L</span></button>
+        <button type="button" data-cmd="justifyCenter" title="{{#str}}align_center, mod_buchbinder{{/str}}" aria-label="{{#str}}align_center, mod_buchbinder{{/str}}">&#x2261;<span class="bb-fb-hint">C</span></button>
+        <button type="button" data-cmd="justifyRight" title="{{#str}}align_right, mod_buchbinder{{/str}}" aria-label="{{#str}}align_right, mod_buchbinder{{/str}}">&#x2261;<span class="bb-fb-hint">R</span></button>
+        <button type="button" data-cmd="justifyFull" title="{{#str}}align_justify, mod_buchbinder{{/str}}" aria-label="{{#str}}align_justify, mod_buchbinder{{/str}}">&#x2261;<span class="bb-fb-hint">J</span></button>
+        <span class="bb-fb-sep"></span>
+        <button type="button" data-cmd="insertUnorderedList" title="{{#str}}bulletlist, mod_buchbinder{{/str}}" aria-label="{{#str}}bulletlist, mod_buchbinder{{/str}}">&#x2022;&#x2261;</button>
+        <button type="button" data-cmd="insertOrderedList" title="{{#str}}numberedlist, mod_buchbinder{{/str}}" aria-label="{{#str}}numberedlist, mod_buchbinder{{/str}}">1&#x2261;</button>
+        <button type="button" data-cmd="outdent" title="{{#str}}outdent, mod_buchbinder{{/str}}" aria-label="{{#str}}outdent, mod_buchbinder{{/str}}">&#x21E4;</button>
+        <button type="button" data-cmd="indent" title="{{#str}}indent, mod_buchbinder{{/str}}" aria-label="{{#str}}indent, mod_buchbinder{{/str}}">&#x21E5;</button>
+        <span class="bb-fb-sep"></span>
+        <button type="button" data-cmd="removeFormat" title="{{#str}}clearformat, mod_buchbinder{{/str}}" aria-label="{{#str}}clearformat, mod_buchbinder{{/str}}">T&#x2093;</button>
+        <span class="bb-fb-status" data-region="formatstatus">{{#str}}formatbarhint, mod_buchbinder{{/str}}</span>
+    </div>
     <div class="bb-desk-main">
         <aside class="bb-desk-pages" aria-label="{{#str}}pages, mod_buchbinder{{/str}}">
             {{#issues}}
@@ -107,7 +139,7 @@
                     <div class="bb-desk-pagehead">
                         <span>{{#str}}pagex, mod_buchbinder, {{position}}{{/str}} · {{sidelabel}}
                             {{#pinlabel}}<span class="bb-desk-pin" title="{{#str}}pinnedpage, mod_buchbinder{{/str}}">{{pinlabel}}</span>{{/pinlabel}}
-                            {{#filler}}<em class="bb-desk-autonote">{{#str}}fillerpage, mod_buchbinder{{/str}}</em>{{/filler}}</span>
+                            {{#filler}}<em class="bb-desk-autonote" title="{{#str}}fillerpage, mod_buchbinder{{/str}}">{{#str}}fillershort, mod_buchbinder{{/str}}</em>{{/filler}}</span>
                         <span class="bb-desk-pageactions">
                             <a href="{{actions.blankbefore}}" title="{{#str}}blankbefore, mod_buchbinder{{/str}}">+&#x2190;</a>
                             <a href="{{actions.blankafter}}" title="{{#str}}blankafter, mod_buchbinder{{/str}}">&#x2192;+</a>

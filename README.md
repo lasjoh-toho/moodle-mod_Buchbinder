@@ -23,6 +23,14 @@ gespiegelt, der Bundsteg liegt immer an der Bindung.
   verteilt. Lange Absätze, Listen und Tabellen werden auf Folgeseiten fortgesetzt, Überschriften
   bleiben beim folgenden Text, Seitenumbrüche aus Word/Markdown werden übernommen. Dokumente
   beginnen auf Wunsch auf einer rechten Seite.
+- **Importtisch (`import.php`):** Vollbild-Arbeitsplatz für importiertes Material. Importe landen
+  zuerst im Importbereich und erscheinen als Miniaturen, gruppiert in Doppelseiten. Ein Seitenbereich
+  (`1-3, 5` oder per Häkchen) wird an eine wählbare Stelle des Dokuments übernommen. Per Rechtsklick
+  lassen sich Seiten teilen, verketten und als linke/rechte Seite festlegen. Bei fortlaufenden Quellen
+  (Word, HTML, Markdown, Web, Zwischenablage) zeigt ein Klick auf eine Miniatur die Passagen der Seite;
+  Passagen lassen sich ausblenden, die Quelle wird dann neu gesetzt. Den Seitenumfang misst der Browser
+  mit [Pretext](https://github.com/chenglou/pretext) in den Schriften der Textrahmen exakt; Absätze
+  werden genau am Zeilenende auf die nächste Seite umbrochen.
 - **Seitenlage als bewusste Entscheidung:** In der Seitenpalette öffnet ein Rechtsklick (oder die
   Kontextmenü-Taste) die Seiteneigenschaften: Seiten mit der Folgeseite **verketten** (Kettensymbol,
   eine Doppelseite) und Seiten als **linke oder rechte Seite festlegen** (Markierung L/R). Werden
@@ -37,7 +45,9 @@ gespiegelt, der Bundsteg liegt immer an der Bindung.
   Fußnoten (Markdown, Word, HTML), Randnotizen (`<span class="sidenote">`, `<span class="marginnote">`,
   Quarto `::: {.column-margin}`, `<aside>`) und kleine Abbildungen stehen dort neben der Zeile, auf
   die sie sich beziehen. Die breiten Ränder liegen immer außen – auch im Druck.
-- **Satzstudio (`desk.php`):** Vollbild-Arbeitsplatz im Stil von DTP-Programmen mit Seitenpalette
+- **Satzstudio (`desk.php`):** Vollbild-Arbeitsplatz im Stil von DTP-Programmen mit Editorleiste wie in
+  einer Textverarbeitung (Formatvorlagen Normaler Text/Titel/Überschrift 1–3/Zitat/Code, Zeichenformate,
+  Farben, Link, Ausrichtung, Listen, Einzug, Rahmenstil, Schriftgröße in pt), Seitenpalette
   (Doppelseiten-Miniaturen), Werkzeugleiste, Montagefläche mit der aktuellen Doppelseite und
   Satzspiegel-Hilfslinien (bei Tufte-Seiten mit Notizspalte) mit Einrasten. Das Eigenschaften-Panel
   erscheint nur, wenn ein Rahmen oder Objekt ausgewählt ist, und schwebt auf der Seite gegenüber der
