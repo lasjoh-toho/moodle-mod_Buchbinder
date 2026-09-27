@@ -126,7 +126,8 @@ if (harvester::is_enabled() && has_capability('mod/buchbinder:harvest', $context
     $webform = new \mod_buchbinder\form\web_form($formurl);
 }
 $form = optional_param('form', '', PARAM_ALPHA);
-$showimport = $form !== '';
+// Reopen the import dialog when a submitted form has errors.
+$showimport = $form !== '' || data_submitted();
 if ($form === 'blank' && ($data = $blankform->get_data())) {
     $importer = new importer($document, ['stage']);
     $importer->add_blank_pages($data->template, (int)$data->count, !empty($data->landscape));
